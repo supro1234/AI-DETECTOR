@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Detector | Documentation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #050505;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.07);
+            --accent-primary: #6366f1;
+            --accent-secondary: #a855f7;
+            --accent-cyan: #06b6d4;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #525252;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #neural-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; opacity: 0.4; pointer-events: none;
+        }
+
+        .container {
+            max-width: 1200px; margin: 0 auto; padding: 4rem 2rem;
+        }
+
+        /* --- Header --- */
+        header {
+            text-align: center; margin-bottom: 6rem;
+        }
+        .badge {
+            display: inline-block; padding: 0.4rem 1rem; border-radius: 999px;
+            background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2);
+            font-size: 0.7rem; font-weight: 800; letter-spacing: 2px; color: var(--accent-primary);
+            text-transform: uppercase; margin-bottom: 1.5rem;
+        }
+        h1 {
+            font-family: 'Outfit', sans-serif; font-size: 4rem; font-weight: 900;
+            background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+            background-clip: text;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem; letter-spacing: -2px;
+        }
+        .subtitle {
+            font-size: 1.1rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto;
+        }
+
+        /* --- Section Styling --- */
+        section {
+            margin-bottom: 8rem; opacity: 0; transform: translateY(30px);
+            transition: var(--transition);
+        }
+        section.visible {
+            opacity: 1; transform: translateY(0);
+        }
+        h2 {
+            font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 900;
+            margin-bottom: 3rem; display: flex; align-items: center; gap: 1rem;
+        }
+        h2::before {
+            content: ""; width: 40px; height: 2px; background: var(--accent-cyan);
+        }
+
+        .glass-card {
+            background: var(--glass); border: 1px solid var(--glass-border);
+            border-radius: 24px; padding: 3rem; position: relative; overflow: hidden;
+            backdrop-filter: blur(20px);
+        }
+        .glass-card::after {
+            content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.03) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* --- Grid Layouts --- */
+        .grid { display: grid; gap: 2rem; }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+        .feature-card {
+            padding: 2rem; border-radius: 20px; background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border); transition: var(--transition);
+        }
+        .feature-card:hover {
+            background: rgba(255, 255, 255, 0.04); transform: translateY(-5px);
+            border-color: var(--accent-cyan);
+        }
+        .feature-card h3 {
+            font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent-cyan);
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .feature-card p { font-size: 0.9rem; color: var(--text-secondary); }
+
+        /* --- List & Tables --- */
+        ul { list-style: none; }
+        li { margin-bottom: 1rem; display: flex; gap: 1rem; align-items: flex-start; }
+        li::before { content: "→"; color: var(--accent-cyan); font-weight: 900; }
+
+        table {
+            width: 100%; border-collapse: collapse; margin: 2rem 0;
+            font-size: 0.85rem; border-radius: 12px; overflow: hidden;
+        }
+        th {
+            background: rgba(255,255,255,0.05); text-align: left; padding: 1.2rem;
+            text-transform: uppercase; letter-spacing: 1px; color: var(--accent-cyan);
+        }
+        td {
+            padding: 1.2rem; border-bottom: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+        }
+
+        /* --- Code Blocks --- */
+        code {
+            font-family: 'JetBrains Mono', monospace; background: rgba(0,0,0,0.4);
+            padding: 0.2rem 0.5rem; border-radius: 4px; color: var(--accent-secondary);
+        }
+        pre {
+            background: #000; padding: 2rem; border-radius: 16px; overflow-x: auto;
+            border: 1px solid var(--glass-border); margin: 2rem 0;
+        }
+        pre code { background: none; padding: 0; color: #d4d4d8; font-size: 0.9rem; }
+
+        .tag-success { color: var(--success); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 3rem; }
+            .grid-2 { grid-template-columns: 1fr; }
+            .glass-card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="neural-canvas"></canvas>
+
+    <div class="container">
+        <header>
+            <div class="badge">SYNERGY PROTOCOL V1.0</div>
+            <h1>AI Image Detector</h1>
+            <p class="subtitle">Neural Forensic Command for deep-level image veracity analysis using cross-API fusion matrix.</p>
+        </header>
+
+        <section id="roadmap">
+            <h2>System Roadmap</h2>
+            <div class="glass-card">
+                <div class="grid grid-2">
+                    <div>
+                        <h3 style="margin-bottom: 1.5rem; color: var(--accent-primary)">CORE CAPABILITIES</h3>
+                        <ul>
+                            <li><strong>Multi-Provider Fusion</strong>: Supports Gemini 2.0 Flash, Groq Llama 3, and OpenRouter (DeepSeek/Grok) adapters.</li>
+                            <li><strong>Anatomical Engine</strong>: Dedicated logic for finger counts, eye symmetry, and ear positioning detection.</li>
+                            <li><strong>Lighting Physics</strong>: Shadow alignment validation and detached shadow artifact identification.</li>
+                            <li><strong>Session-Only Auth</strong>: AES-encrypted transient storage for API keys. Zero disk persistence.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 style="margin-bottom: 1.5rem; color: var(--accent-cyan)">STABILITY STATUS</h3>
+                        <table>
+                            <tr><td>Backend Bridge (Python 3.11)</td><td><span class="tag-success">STABLE</span></td></tr>
+                            <tr><td>Frontend (Vite 5.0)</td><td><span class="tag-success">STABLE</span></td></tr>
+                            <tr><td>OpenRouter Adapter</td><td><span class="tag-success">ACTIVE</span></td></tr>
+                            <tr><td>Forensic Score Fusion</td><td><span class="tag-success">VERIFIED</span></td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="installation">
+            <h2>Installation Guide</h2>
+            <div class="glass-card">
+                <p style="margin-bottom: 2rem; color: var(--text-secondary)">Standard deployment workflow for modern workstation environments.</p>
+                
+                <h3 style="margin-bottom: 1rem; color: var(--accent-cyan)">1. Machine Preparation</h3>
+                <p>Ensure Node.js (v18+) and Python (3.10+) are installed. If you face execution errors on Windows PowerShell, bypass terminal policy:</p>
+                <pre><code>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code></pre>
+
+                <h3 style="margin-top: 2.5rem; margin-bottom: 1rem; color: var(--accent-cyan)">2. Dependency Provisioning</h3>
+                <pre><code># Root folder (Installs concurrently for Node)
+npm install
+
+# Backend folder (Python dependencies)
+pip install google-generativeai groq requests</code></pre>
+
+                <h3 style="margin-top: 2.5rem; margin-bottom: 1rem; color: var(--accent-cyan)">3. Neural Launch</h3>
+                <p>Start the forensic lab in dev mode. Concurrently boots both Express and Vite servers.</p>
+                <pre><code>npm run dev</code></pre>
+            </div>
+        </section>
+
+        <section id="methodology">
+            <h2>Forensic Methodology</h2>
+            <div class="grid grid-2">
+                <div class="feature-card">
+                    <h3>Anatomical Logic</h3>
+                    <p>AI generators often hallucinate extra digits or skewed joints. The engine inspects finger articulation, pupillary symmetry, and ear placement consistency.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Lighting Physics</h3>
+                    <p>Detects "impossible shadows" that are detached from their source or cast in directions conflicting with the primary light source.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Background Artifacts</h3>
+                    <p>Identifies 'ghosting' (half-formed objects) and repetitive patterns in organic textures like clouds, grass, or water.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Edge Consistency</h3>
+                    <p>Zooms in on fine details like hair strands. Detects the 'waxy/plastic' sheen or unnatural sharpness characteristic of AI upscaling and smoothing.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="api">
+            <h2>Neural API Matrix</h2>
+            <div class="glass-card">
+                <p style="margin-bottom: 2rem;">Unified interface for cross-model verification.</p>
+                <div class="grid grid-3" id="api-grid">
+                    <!-- Dynamic Grid Items -->
+                </div>
+            </div>
+        </section>
+
+        <section id="troubleshooting">
+            <h2>Troubleshooting</h2>
+            <div class="glass-card" style="border-color: var(--warning)">
+                <ul>
+                    <li><strong>ECONNREFUSED</strong>: Ensure your backend is running on <code>localhost:8301</code>. Check terminal for Node.js errors.</li>
+                    <li><strong>API Auth Failed</strong>: Tokens are case-sensitive. Verify provider selection (Gemini vs Groq vs OpenRouter).</li>
+                    <li><strong>Python Not Found</strong>: If <code>python</code> fails, update <code>server.js</code> line 14 to <code>'python3'</code> for macOS/Linux users.</li>
+                    <li><strong>Upload Limit</strong>: Maximum file size is 50MB. High-res TIFFs should be converted to JPG/PNG for faster analysis.</li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // --- Neural Background Background ---
+        const canvas = document.getElementById('neural-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            init();
+        }
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 0.4;
+                this.vy = (Math.random() - 0.5) * 0.4;
+                this.size = Math.random() * 2;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            }
+            draw() {
+                ctx.fillStyle = 'rgba(99, 102, 241, 0.5)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function init() {
+            particles = [];
+            for (let i = 0; i < 60; i++) particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update(); p.draw();
+                particles.forEach(p2 => {
+                    const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+                    if (dist < 150) {
+                        ctx.strokeStyle = `rgba(99, 102, 241, ${1 - dist/150})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+                    }
+                });
+            });
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resize);
+        resize(); animate();
+
+        // --- Scroll Revel ---
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) entry.target.classList.add('visible');
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('section').forEach(s => observer.observe(s));
+
+        // --- API Grid Data ---
+        const API_MAP = [
+            { provider: 'GEMINI 2.0', model: 'gemini-2.0-flash', usage: 'Primary Vision Core' },
+            { provider: 'GROQ LLAMA', model: 'llama-4-scout-17b', usage: 'Speed Inference' },
+            { provider: 'OPENROUTER', model: 'google/gemini-2.0-flash', usage: 'Fallback Gateway' }
+        ];
+
+        const apiGrid = document.getElementById('api-grid');
+        API_MAP.forEach(api => {
+            const div = document.createElement('div');
+            div.className = 'feature-card';
+            div.innerHTML = `
+                <div style="font-size: 0.6rem; color: var(--accent-primary); font-weight: 800; letter-spacing: 2px; margin-bottom: 0.5rem">${api.provider}</div>
+                <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: #fff">${api.model}</h3>
+                <p>${api.usage}</p>
+            `;
+            apiGrid.appendChild(div);
+        });
+
+    </script>
+</body>
+</html>
