@@ -24,8 +24,9 @@ export default function SetupPage({ onConnect }) {
       sessionStorage.removeItem('groq_key')
       sessionStorage.removeItem('openrouter_key')
 
-      console.log(`[CONN_DEBUG] Requesting connection sync for: ${provider}`);
-      const response = await axios.post('http://localhost:8301/api/test-connection', { 
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8301';
+      console.log(`[CONN_DEBUG] Requesting connection sync for: ${provider} at ${API_BASE}`);
+      const response = await axios.post(`${API_BASE}/api/test-connection`, { 
         provider, 
         api_key: apiKey 
       })

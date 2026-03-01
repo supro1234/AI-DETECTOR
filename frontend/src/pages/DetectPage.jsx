@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8301';
 import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, FileImage, ShieldAlert, CheckCircle, Info, Scan, Loader2, RefreshCw, Link2, Download, X, BarChart2, Activity, Terminal } from 'lucide-react'
 import axios from 'axios'
@@ -97,7 +98,7 @@ export default function DetectPage({ config, onReset }) {
   const runAnalysis = async () => {
     setAnalyzing(true); setResult(null); setConsoleLog([])
     const stages = ["SYNCHRONIZING_CORES", "RGB_GRID_EXTRACTION", "NOISE_PATTERN_MAP", "VERDICT_SYNTHESIS"]
-    addLog("CMD", "STAGING_FORENSIC_ENGINE", 'info')
+    addLog("CMD", `STAGING_FORENSIC_ENGINE at ${API_BASE}`, 'info')
     
     let i = 0
     stageIntervalRef.current = setInterval(() => {
@@ -109,7 +110,7 @@ export default function DetectPage({ config, onReset }) {
     try {
       let response
       if (tab === 'url') {
-        response = await axios.post('http://localhost:8301/api/analyze-url', {
+        response = await axios.post(`${API_BASE}/api/analyze-url`, {
           gemini_key: config.provider === 'gemini' ? config.apiKey : '',
           groq_key: config.provider === 'groq' ? config.apiKey : '',
           openrouter_key: config.provider === 'openrouter' ? config.apiKey : '',
@@ -121,7 +122,7 @@ export default function DetectPage({ config, onReset }) {
         if (config.provider === 'gemini') formData.append('gemini_key', config.apiKey)
         else if (config.provider === 'groq') formData.append('groq_key', config.apiKey)
         else if (config.provider === 'openrouter') formData.append('openrouter_key', config.apiKey)
-        response = await axios.post('http://localhost:8301/api/analyze', formData)
+        response = await axios.post(`${API_BASE}/api/analyze`, formData)
       }
       
       clearInterval(stageIntervalRef.current)
