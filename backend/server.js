@@ -271,6 +271,58 @@ app.post('/api/analyze-url', async (req, res) => {
     }
 });
 
+// --- Generate Forensic Report (DOCX) ---
+app.post('/api/generate-report', (req, res) => {
+    const data = req.body;
+    if (!data || !data.verdict) {
+        return res.status(400).json({ error: 'Incomplete analysis data.' });
+    }
+
+    const reportDir = path.join(__dirname, 'reports');
+    if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
+
+    const filename = `Forensic_Report_${data.id || Date.now()}.docx`;
+    const outputPath = path.join(reportDir, filename);
+    const script = path.join(__dirname, 'engine', 'report_generator.py');
+
+    const { spawn } = require('child_process');
+    const py = spawn(PYTHON, [script, outputPath]);
+
+    let stdoutData = '';
+    let stderrData = '';
+    py.stdout.on('data', (d) => { stdoutData += d.toString(); });
+    py.stderr.on('data', (d) => { stderrData += d.toString(); });
+
+    py.on('close', (code) => {
+        if (code !== 0) {
+            console.error('[Report Error] Code:', code, stderrData);
+            return res.status(500).json({ error: 'Report generation failed', detail: stderrData || stdoutData });
+        }
+        const out = stdoutData.trim();
+        if (out.startsWith('SUCCESS:')) {
+            const finalPath = out.split('SUCCESS:')[1].trim();
+            res.download(finalPath, filename, (err) => {
+                if (!err) { try { fs.unlinkSync(finalPath); } catch (_) {} }
+            });
+        } else {
+            console.error('[Report Engine Error]', stdoutData, stderrData);
+            res.status(500).json({ error: 'Report engine error', detail: stdoutData || stderrData });
+        }
+    });
+
+    py.on('error', (err) => {
+        console.error('[Report Spawn Error]', err.message);
+        if (!res.headersSent) res.status(500).json({ error: 'Could not start Python', detail: err.message });
+    });
+
+    try {
+        py.stdin.write(JSON.stringify(data), 'utf8');
+        py.stdin.end();
+    } catch (e) {
+        console.error('[Report Stdin Error]', e.message);
+    }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
     console.log(`✅ AI Image Detector API running → http://localhost:${PORT}`);

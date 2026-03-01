@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import axios from 'axios'
 import { motion, AnimatePresence } from 'framer-motion'
 import { History, Trash2, Calendar, FileText, Activity, ShieldCheck, ShieldAlert, ChevronDown, Filter, Loader2 } from 'lucide-react'
 
@@ -74,6 +75,26 @@ export default function HistoryPage() {
     await clearAll()
     setItems([])
     setSelected(null)
+  }
+
+  const handleDownloadReport = async (item) => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8301';
+      const response = await axios.post(`${API_BASE}/api/generate-report`, item, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Forensic_Report_${item.id || 'export'}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('REPORT_GENERATION_FAILED');
+    }
   }
 
   return (
@@ -201,8 +222,8 @@ export default function HistoryPage() {
                           <button onClick={(e) => { e.stopPropagation(); doDelete(item.id) }} style={{ flex: 1, padding: '0.6rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', color: '#ef4444', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', borderRadius: '6px' }}>
                             PURGE_RECORD
                           </button>
-                          <button style={{ flex: 1, padding: '0.6rem', background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', borderRadius: '6px' }}>
-                            EXPORT_AS_PDF
+                          <button onClick={(e) => { e.stopPropagation(); handleDownloadReport(item) }} style={{ flex: 1, padding: '0.6rem', background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', borderRadius: '6px' }}>
+                            EXPORT_DOCX
                           </button>
                         </div>
                       </div>

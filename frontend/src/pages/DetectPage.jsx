@@ -132,11 +132,63 @@ export default function DetectPage({ config, onReset }) {
       if (response.data.verdict?.toLowerCase().includes('real')) {
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.7 }, colors: ['#6366f1', '#a855f7', '#06b6d4'] })
       }
+
+      // ─── Save to History (IndexedDB) ───
+      try {
+        const dbReq = indexedDB.open('AID_History', 1);
+        dbReq.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('analyses')) {
+            db.createObjectStore('analyses', { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        dbReq.onsuccess = (e) => {
+          const db = e.target.result;
+          const tx = db.transaction('analyses', 'readwrite');
+          const store = tx.objectStore('analyses');
+          const record = {
+            ...response.data,
+            imageUrl: tab === 'url' ? urlInput : filePreview?.src,
+            timestamp: new Date().toISOString()
+          };
+          store.add(record);
+          addLog("SYS", "ARCHIVE_RECORD_STORED", 'success');
+        };
+      } catch (dbErr) {
+        console.error('Failed to save to history:', dbErr);
+      }
     } catch (err) {
       clearInterval(stageIntervalRef.current)
       addLog("ERR", "NEURAL_LINK_SEVERED", 'error')
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  const handleDownloadReport = async () => {
+    if (!result) return;
+    try {
+      addLog("SYS", "GENERATING_DOCX_REPORT...", 'info')
+      // Attach the image data so the report can embed it
+      const reportPayload = {
+        ...result,
+        imageUrl: tab === 'url' ? urlInput : filePreview?.src || null
+      };
+      const response = await axios.post(`${API_BASE}/api/generate-report`, reportPayload, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Forensic_Report_${result.id || 'export'}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      addLog("SYS", "REPORT_DOWNLOAD_STARTED", 'success')
+    } catch (err) {
+      console.error('Download error:', err);
+      addLog("ERR", "REPORT_GENERATION_FAILED", 'error')
     }
   }
 
@@ -284,15 +336,15 @@ export default function DetectPage({ config, onReset }) {
                   border: `1px solid ${vColor}`, 
                   background: `rgba(${isReal ? '16,185,129' : (isEnhanced ? '245,158,11' : '239,68,68')}, 0.05)` 
                 }}>
-                  <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
                     <ConfidenceRing score={100 - result.confidence_score} color={vColor} />
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.6rem' }}>
                         {isReal ? <CheckCircle size={24} color="var(--success)" /> : isEnhanced ? <Info size={24} color="var(--warning)" /> : <ShieldAlert size={24} color="var(--danger)" />}
                         <h3 style={{ fontSize: '2rem', color: vColor }}>{result.verdict?.toUpperCase()}</h3>
                       </div>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', lineHeight: '1.5', maxWidth: '300px' }}>
-                        {result.explanation ? result.explanation.slice(0, 140) + '...' : 'Awaiting forensic synthesis...'}
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', lineHeight: '1.5', flex: 1 }}>
+                        {result.explanation || 'Awaiting forensic synthesis...'}
                       </p>
                     </div>
                   </div>
@@ -312,7 +364,7 @@ export default function DetectPage({ config, onReset }) {
                 {/* Actions */}
                 <div style={{ display:'flex', gap: '1rem' }}>
                   <button onClick={() => { setResult(null); setFile(null); setFilePreview(null) }} className="btn btn-outline" style={{ flex: 1, height: '54px' }}>NEW_CASE</button>
-                  <button className="btn btn-primary" style={{ flex: 1, height: '54px' }}>
+                  <button className="btn btn-primary" onClick={handleDownloadReport} style={{ flex: 1, height: '54px' }}>
                     <Download size={18} /> DOWNLOAD_REPORT
                   </button>
                 </div>

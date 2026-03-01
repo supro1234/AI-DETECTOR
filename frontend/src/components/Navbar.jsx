@@ -4,9 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Cpu, ShieldCheck, History, Sparkles, LogOut, ChevronDown, Activity, Terminal } from 'lucide-react'
 
 const LINKS = [
-  { to: '/',         label: 'COMMAND', icon: Terminal },
+  { to: '/',         label: 'ANALYSIS', icon: Terminal },
   { to: '/history',  label: 'ARCHIVES', icon: History },
-  { to: '/upcoming', label: 'ROADMAP', icon: Sparkles },
+  { to: '/upcoming', label: 'UPCOMING UPDATES', icon: Sparkles },
 ]
 
 export default function Navbar({ provider, onReset }) {

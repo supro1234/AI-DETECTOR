@@ -103,7 +103,7 @@ function MiniParticles({ color }) {
     animate()
     return () => { cancelAnimationFrame(frame); renderer.dispose(); if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement) }
   }, [color])
-  return <div ref={ref} style={{ position:'absolute', inset:0, opacity:0.4, pointerEvents:'none' }} />
+  return <div ref={ref} style={{ position:'absolute', inset:0, opacity:0.15, pointerEvents:'none' }} />
 }
 
 export default function UpcomingPage() {
@@ -122,7 +122,7 @@ export default function UpcomingPage() {
         </motion.div>
         
         <h1 className="gradient-text" style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>Evolution Core</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: '1.6' }}>
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: '1.6' }}>
           Advancing the frontier of media verification. Each module represents a phase in our mission to neutralize synthetic deception.
         </p>
       </div>
@@ -136,7 +136,12 @@ export default function UpcomingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
             className="glass-card" 
-            style={{ padding: '2rem', position: 'relative', overflow: 'hidden', minHeight: '400px', display:'flex', flexDirection:'column' }}
+            style={{ 
+              padding: '2rem', position: 'relative', overflow: 'hidden', minHeight: '400px', display:'flex', flexDirection:'column',
+              background: 'rgba(5, 5, 12, 0.85)',
+              backdropFilter: 'blur(16px)',
+              border: `1px solid ${s.color}33`
+            }}
           >
             <MiniParticles color={s.color} />
             <div className="scan-line" style={{ animationDelay: `${idx * 0.5}s` }} />
@@ -161,8 +166,8 @@ export default function UpcomingPage() {
               <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
                 {s.features.map((f, i) => (
                   <div key={i} style={{ 
-                    fontSize:'0.78rem', color: s.status === 'live' ? 'white' : 'var(--text-secondary)',
-                    opacity: s.status === 'live' ? 1 : 0.7,
+                    fontSize:'0.78rem', color: s.status === 'live' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.75)',
+                    opacity: 1,
                     display: 'flex', alignItems: 'flex-start', gap: '8px'
                   }}>
                     <div style={{ minWidth:'4px', height:'4px', borderRadius:'50%', background: s.color, marginTop:'7px' }} />
