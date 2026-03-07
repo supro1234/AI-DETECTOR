@@ -45,6 +45,12 @@ except ImportError:
 
 from prompts import IMAGE_FORENSIC_PROMPT
 
+try:
+    from local_faceswap_detector import run_local_faceswap_detection
+    LOCAL_DETECTOR_AVAILABLE = True
+except ImportError:
+    LOCAL_DETECTOR_AVAILABLE = False
+
 # --------------------------------------------------------------------------- #
 # Supported image types                                                         #
 # --------------------------------------------------------------------------- #
@@ -238,7 +244,14 @@ def analyze_groq(api_key: str, image_path: str) -> dict:
 FACE_SWAP_KEYWORDS = [
     'face swap', 'faceswap', 'face-swap', 'boundary seam', 'skin tone mismatch',
     'face boundary', 'blending artifact', 'jawline inconsistency', 'neck seam',
-    'hairline blending', 'face texture discontinuity', 'swapped face'
+    'hairline blending', 'face texture discontinuity', 'swapped face',
+    # Modern face swap tool signatures
+    'insightface', 'inswapper', 'gfpgan', 'simswap', 'deepfacelab',
+    'boundary halo', 'skin tone island', 'resolution mismatch', 'hd face',
+    'lighting discrepancy', 'texture boundary', 'frequency artifact',
+    'over-sharpening', 'over-sharpened', 'pore discontinuity', 'color temperature mismatch',
+    'skin color mismatch', 'face region sharper', 'face region blurrier',
+    'identity geometry', 'pre-scan', 'indicator'
 ]
 
 def post_process_face_swap(result: dict) -> dict:
@@ -264,7 +277,7 @@ def post_process_face_swap(result: dict) -> dict:
     verdict_is_faceswap = result.get("verdict", "").lower() in ["face swap", "faceswap", "face-swap"]
 
     # Determine final face_swap_detected
-    final_detected = bool(model_detected) or verdict_is_faceswap or (keyword_hit and face_swap_conf >= 60)
+    final_detected = bool(model_detected) or verdict_is_faceswap or (keyword_hit and face_swap_conf >= 40) or (face_swap_conf >= 50)
 
     result["face_swap_detected"] = final_detected
     result["face_swap_confidence"] = face_swap_conf
@@ -272,7 +285,7 @@ def post_process_face_swap(result: dict) -> dict:
     # Upgrade verdict if face swap clearly detected but verdict wasn't set
     if final_detected and result.get("verdict") not in ["Face Swap"]:
         # Only upgrade to Face Swap if confidence is high
-        if face_swap_conf >= 75 or verdict_is_faceswap:
+        if face_swap_conf >= 50 or verdict_is_faceswap:
             result["verdict"] = "Face Swap"
 
     return result
@@ -425,6 +438,18 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
 
     t_start = time.time()
 
+    # ── STEP 0: Local pixel-level forensic pre-scan ────────────────────────── #
+    local_result = {"local_faceswap_detected": False, "local_faceswap_confidence": 0,
+                    "local_forensic_summary": "Local detector not available", "checks": {}}
+    if LOCAL_DETECTOR_AVAILABLE:
+        try:
+            local_result = run_local_faceswap_detection(image_path)
+            print(f"[LOCAL_DETECTOR] detected={local_result['local_faceswap_detected']} "
+                  f"conf={local_result['local_faceswap_confidence']}%", file=sys.stderr)
+        except Exception as le:
+            print(f"[LOCAL_DETECTOR] Error: {le}", file=sys.stderr)
+
+    # ── STEP 1: AI API analysis ────────────────────────────────────────────── #
     if mode == "gemini":
         result = analyze_gemini(gemini_key, image_path, openrouter_key)
         result["_sources_used"] = [result.get("_source", "Gemini 2.0 Flash")]
@@ -451,11 +476,105 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
 
         result = merge_results(r_gemini, r_groq)
 
-    # Post-process: face swap detection (applies to all modes)
+    # ── STEP 2: AI post-process face swap detection ────────────────────────── #
     if "error" not in result:
         result = post_process_face_swap(result)
 
-    # Global verdict refinement
+    # ── STEP 3: Fuse local detector results with AI results ────────────────── #
+    # DECISION LOGIC (organised priority order):
+    #
+    #  Rule A — AI clearly says Face Swap → keep it (local adds evidence only)
+    #  Rule B — AI says AI Generated / Highly Suspicious (no face swap flag)
+    #            AND local fires → do NOT override (fully-generated image, not a swap)
+    #  Rule C — AI is inconclusive / uncertain AND local is confident (>=50%) → Face Swap
+    #  Rule D — AI suspected face swap (ai face_swap_confidence > 0) AND local confirms → Face Swap
+    #  Rule E — Anything else below 50% local conf → ignore local, keep AI result
+
+    if "error" not in result and local_result:
+        local_detected  = local_result.get("local_faceswap_detected", False)
+        local_conf      = int(local_result.get("local_faceswap_confidence", 0))
+        local_summary   = local_result.get("local_forensic_summary", "")
+
+        # Store local findings in result for full transparency
+        result["_local_faceswap_detected"] = local_detected
+        result["_local_faceswap_confidence"] = local_conf
+        result["_local_forensic_summary"] = local_summary
+        result["_local_checks"] = local_result.get("checks", {})
+
+        ai_verdict       = result.get("verdict", "")
+        ai_fs_detected   = bool(result.get("face_swap_detected", False))
+        ai_fs_conf       = int(result.get("face_swap_confidence", 0))
+
+        # Protected verdicts: local detector CANNOT override these to "Face Swap"
+        # - "AI Generated Proof/AI Generated/Highly Suspicious" = fully synthetic image
+        #   (shares traits with face swaps but is NOT a face swap)
+        # - "Likely Real/Verified Real" = AI is confident this is a real authentic photo
+        # NOT protected: "AI Camera / Enhanced", "Uncertain" — InsightFace swaps are
+        # frequently classified as these by AI models, so local can override them.
+        FULLY_AI_VERDICTS = {
+            "AI Generated Proof", "AI Generated", "Highly Suspicious",
+            "Likely Real", "Verified Real"
+        }
+
+        # ── Rule A: AI already decided Face Swap — just add local evidence ── #
+        if ai_verdict == "Face Swap":
+            if local_detected and local_summary:
+                existing_flags = result.get("key_red_flags", [])
+                result["key_red_flags"] = existing_flags + [
+                    f"[LOCAL CONFIRM] {local_summary[:150]}"
+                ]
+
+        # ── Rule B: AI says fully-generated — do NOT let local override ────── #
+        elif ai_verdict in FULLY_AI_VERDICTS and not ai_fs_detected:
+            # Local detector fired but AI disagrees this is a swap — trust AI
+            # (AI-generated images share traits with face swaps: smooth skin, HD textures)
+            result["_local_detector_note"] = (
+                f"Local detector fired ({local_conf}%) but AI classified as '{ai_verdict}' "
+                f"with no face swap signal — keeping AI verdict (fully-generated image)."
+            )
+
+        # ── Rule C: AI uncertain/weak + local is confident ≥ 50% ──────────── #
+        elif local_detected and local_conf >= 50 and ai_verdict not in FULLY_AI_VERDICTS:
+            result["face_swap_detected"] = True
+            result["face_swap_confidence"] = max(ai_fs_conf, local_conf)
+            result["verdict"] = "Face Swap"
+            result["confidence_score"] = max(
+                int(result.get("confidence_score", 0)),
+                min(88, local_conf + 10)
+            )
+            existing_flags = result.get("key_red_flags", [])
+            result["key_red_flags"] = existing_flags + [
+                f"[LOCAL DETECTOR] {local_summary[:200]}"
+            ]
+            fp = result.get("forensic_points", {})
+            fp["face_swap_analysis"] = (
+                f"LOCAL OPENCV DETECTION ({local_conf}% confidence): {local_summary}\n"
+                + str(fp.get("face_swap_analysis", ""))
+            )
+            result["forensic_points"] = fp
+
+        # ── Rule D: AI suspected face swap + local confirms ≥ 50% ─────────── #
+        elif ai_fs_detected and ai_fs_conf > 0 and local_detected and local_conf >= 50:
+            result["face_swap_detected"] = True
+            result["face_swap_confidence"] = max(ai_fs_conf, local_conf)
+            result["verdict"] = "Face Swap"
+            result["confidence_score"] = max(
+                int(result.get("confidence_score", 0)),
+                min(88, (ai_fs_conf + local_conf) // 2 + 10)
+            )
+            existing_flags = result.get("key_red_flags", [])
+            result["key_red_flags"] = existing_flags + [
+                f"[LOCAL+AI CONFIRM] {local_summary[:200]}"
+            ]
+
+        # ── Rule E: below threshold — ignore local, keep AI verdict ─────────── #
+        else:
+            result["_local_detector_note"] = (
+                f"Local confidence {local_conf}% below threshold (50%) — AI verdict kept."
+            )
+
+
+    # ── STEP 4: Global verdict refinement ─────────────────────────────────── #
     if "confidence_score" in result:
         result["verdict"] = refine_verdict(result["confidence_score"], result.get("verdict", ""))
 

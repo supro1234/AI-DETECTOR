@@ -65,23 +65,49 @@ export default function Navbar({ provider, onReset }) {
         </div>
       </NavLink>
 
-      {/* Primary Links */}
-      <div style={{ display: 'flex', gap: '1rem', background: 'rgba(255,255,255,0.02)', padding: '0.4rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+      {/* Primary Links — Translucent Blur Tab Strip */}
+      <div style={{
+        display: 'flex', gap: '0.4rem',
+        background: 'rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(18px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+        padding: '0.35rem',
+        borderRadius: '14px',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06)'
+      }}>
         {LINKS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 1.2rem', 
-              borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, textDecoration: 'none', letterSpacing: '1px',
-              transition: 'all 0.3s',
-              background: isActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-              color: isActive ? 'white' : 'var(--text-muted)',
-              border: isActive ? '1px solid rgba(99, 102, 241, 0.2)' : '1px solid transparent'
+              display: 'flex', alignItems: 'center', gap: '0.55rem',
+              padding: '0.45rem 1.1rem',
+              borderRadius: '10px',
+              fontSize: '0.68rem', fontWeight: 800,
+              textDecoration: 'none', letterSpacing: '1px',
+              transition: 'all 0.25s ease',
+              /* Active: frosted glass highlight with accent glow */
+              background: isActive
+                ? 'rgba(99, 102, 241, 0.18)'
+                : 'transparent',
+              backdropFilter: isActive ? 'blur(12px)' : 'none',
+              WebkitBackdropFilter: isActive ? 'blur(12px)' : 'none',
+              color: isActive ? 'white' : 'rgba(255,255,255,0.45)',
+              border: isActive
+                ? '1px solid rgba(99, 102, 241, 0.35)'
+                : '1px solid transparent',
+              boxShadow: isActive
+                ? '0 0 16px rgba(99, 102, 241, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)'
+                : 'none',
             })}
           >
-            <Icon size={14} color={(location?.pathname === to || (to === '/' && location?.pathname === '')) ? 'var(--accent-primary)' : 'inherit'} />
+            <Icon
+              size={13}
+              color={(location?.pathname === to || (to === '/' && location?.pathname === ''))
+                ? 'var(--accent-primary)' : 'inherit'}
+            />
             <span>{label}</span>
           </NavLink>
         ))}

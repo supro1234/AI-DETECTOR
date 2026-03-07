@@ -232,11 +232,6 @@ export default function ThreeHero({ intensity = 1, density = 1 }) {
       mouse.x += (target.x - mouse.x) * 0.04
       mouse.y += (target.y - mouse.y) * 0.04
 
-      // ── Hub ──────────────────────────────────────────────────────────────
-      core.rotation.y += 0.006
-      core.rotation.x += 0.003
-      core.scale.setScalar(1 + Math.sin(t * 2.5) * 0.12)
-
       hubGroup.children[1].rotation.y -= 0.004
       hubGroup.children[1].rotation.x += 0.002
       ring2.rotation.z += 0.0015
