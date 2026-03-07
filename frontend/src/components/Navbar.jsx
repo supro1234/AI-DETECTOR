@@ -30,11 +30,18 @@ export default function Navbar({ provider, onReset }) {
   return (
     <nav style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
-      background: scrolled ? 'rgba(2, 2, 4, 0.9)' : 'transparent',
-      borderBottom: scrolled ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-      transition: 'var(--transition)',
-      padding: scrolled ? '0.75rem 2.5rem' : '1.5rem 2.5rem',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+      /* Only opacity/background change on scroll — no layout reflow */
+      background: scrolled ? 'rgba(3, 3, 8, 0.92)' : 'transparent',
+      backdropFilter: scrolled ? 'blur(20px) saturate(180%)' : 'none',
+      WebkitBackdropFilter: scrolled ? 'blur(20px) saturate(180%)' : 'none',
+      borderBottom: '1px solid ' + (scrolled ? 'rgba(255, 255, 255, 0.06)' : 'transparent'),
+      /* Fixed padding — eliminates layout reflow on every scroll event */
+      padding: '1rem 2.5rem',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      transition: 'background 0.3s ease, backdrop-filter 0.3s ease, border-color 0.3s ease',
+      /* GPU layer — no repaint from canvas below */
+      willChange: 'background, opacity',
+      transform: 'translateZ(0)',
     }}>
       
       {/* Brand Unit */}

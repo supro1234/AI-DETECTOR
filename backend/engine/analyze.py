@@ -1,10 +1,16 @@
 """
 engine/analyze.py
 ─────────────────
-Dual-API Fusion Engine for AI Image Detection.
+Dual-API Fusion Engine for AI Image Detection with Face Swap Detection.
 
 Calls Gemini 2.0 Flash AND Groq Llama-4 Scout SIMULTANEOUSLY using
 concurrent.futures, then merges results into a single authoritative verdict.
+
+Features:
+  - 16-point forensic analysis (including Face Swap as Point 16)
+  - Gemini rate-limit retry with exponential backoff (3 retries: 1→2→4s)
+  - Auto-fallback from Gemini → OpenRouter on rate-limit exhaustion
+  - Face Swap Detection with dedicated verdict and confidence score
 
 Supports all common image formats:
   JPEG, PNG, GIF, WEBP, BMP, TIFF, HEIC, AVIF, ICO, SVG (rasterized)
@@ -78,32 +84,68 @@ def clean_json(text: str) -> dict:
     return json.loads(text.strip())
 
 
+def is_rate_limit_error(err_str: str) -> bool:
+    """Check if an error string indicates a rate limit / quota error."""
+    lower = err_str.lower()
+    return any(kw in lower for kw in [
+        '429', 'resource_exhausted', 'rate limit', 'quota exceeded',
+        'too many requests', 'rateLimitExceeded'
+    ])
+
+
 # --------------------------------------------------------------------------- #
-# Gemini Analysis                                                               #
+# Gemini Analysis (with retry + fallback)                                       #
 # --------------------------------------------------------------------------- #
-def analyze_gemini(api_key: str, image_path: str) -> dict:
+def analyze_gemini(api_key: str, image_path: str, openrouter_key: str = '') -> dict:
     if genai is None:
         return {"error": "google-generativeai not installed"}
     if not api_key:
         return {"error": "No Gemini API key provided"}
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
 
-        with open(image_path, 'rb') as f:
-            img_bytes = f.read()
+    max_retries = 3
+    delay = 1  # seconds, doubles each retry
 
-        mime = get_mime_type(image_path)
-        response = model.generate_content([
-            IMAGE_FORENSIC_PROMPT,
-            {"mime_type": mime, "data": img_bytes}
-        ])
+    for attempt in range(max_retries):
+        try:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("gemini-2.0-flash")
 
-        result = clean_json(response.text)
-        result["_source"] = "Gemini 2.0 Flash"
-        return result
-    except Exception as e:
-        return {"error": str(e), "_source": "Gemini 2.0 Flash"}
+            with open(image_path, 'rb') as f:
+                img_bytes = f.read()
+
+            mime = get_mime_type(image_path)
+            response = model.generate_content([
+                IMAGE_FORENSIC_PROMPT,
+                {"mime_type": mime, "data": img_bytes}
+            ])
+
+            result = clean_json(response.text)
+            result["_source"] = "Gemini 2.0 Flash"
+            if attempt > 0:
+                result["_retry_note"] = f"Succeeded on retry {attempt + 1}"
+            return result
+
+        except Exception as e:
+            err_str = str(e)
+            if is_rate_limit_error(err_str):
+                print(f"[GEMINI_RATE_LIMIT] Attempt {attempt + 1}/{max_retries}. Waiting {delay}s...", file=sys.stderr)
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
+                else:
+                    # All retries exhausted — try OpenRouter fallback
+                    print("[GEMINI_RATE_LIMIT] All retries exhausted. Attempting OpenRouter fallback...", file=sys.stderr)
+                    if openrouter_key:
+                        fallback = analyze_openrouter(openrouter_key, image_path)
+                        fallback["_fusion_note"] = "Gemini rate-limited (429) — auto-fell back to OpenRouter"
+                        fallback["_gemini_fallback"] = True
+                        return fallback
+                    return {"error": f"Gemini rate limit exceeded after {max_retries} retries. No OpenRouter fallback key available.", "_source": "Gemini 2.0 Flash"}
+            else:
+                return {"error": err_str, "_source": "Gemini 2.0 Flash"}
+
+    return {"error": "Gemini: Unknown retry failure", "_source": "Gemini 2.0 Flash"}
 
 
 # --------------------------------------------------------------------------- #
@@ -191,10 +233,60 @@ def analyze_groq(api_key: str, image_path: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Face Swap Post-Processing                                                     #
+# --------------------------------------------------------------------------- #
+FACE_SWAP_KEYWORDS = [
+    'face swap', 'faceswap', 'face-swap', 'boundary seam', 'skin tone mismatch',
+    'face boundary', 'blending artifact', 'jawline inconsistency', 'neck seam',
+    'hairline blending', 'face texture discontinuity', 'swapped face'
+]
+
+def post_process_face_swap(result: dict) -> dict:
+    """
+    Analyze the result to determine face_swap_detected flag.
+    Uses the model's own face_swap_detected field if present,
+    otherwise scans red_flags and face_swap_analysis for keywords.
+    """
+    # Use model's own assertion if clearly true
+    model_detected = result.get("face_swap_detected", False)
+    face_swap_conf = int(result.get("face_swap_confidence", 0))
+
+    # Also scan red flags + face_swap_analysis text for keywords
+    text_to_scan = ' '.join([
+        str(result.get("forensic_points", {}).get("face_swap_analysis", "")),
+        ' '.join(result.get("key_red_flags", [])),
+        result.get("explanation", "")
+    ]).lower()
+
+    keyword_hit = any(kw in text_to_scan for kw in FACE_SWAP_KEYWORDS)
+
+    # Also check if verdict is "Face Swap"
+    verdict_is_faceswap = result.get("verdict", "").lower() in ["face swap", "faceswap", "face-swap"]
+
+    # Determine final face_swap_detected
+    final_detected = bool(model_detected) or verdict_is_faceswap or (keyword_hit and face_swap_conf >= 60)
+
+    result["face_swap_detected"] = final_detected
+    result["face_swap_confidence"] = face_swap_conf
+
+    # Upgrade verdict if face swap clearly detected but verdict wasn't set
+    if final_detected and result.get("verdict") not in ["Face Swap"]:
+        # Only upgrade to Face Swap if confidence is high
+        if face_swap_conf >= 75 or verdict_is_faceswap:
+            result["verdict"] = "Face Swap"
+
+    return result
+
+
+# --------------------------------------------------------------------------- #
 # Result Refinement                                                             #
 # --------------------------------------------------------------------------- #
 def refine_verdict(score: int, original_verdict: str) -> str:
     """Standardize verdict based on confidence score and original model intent."""
+    # Preserve Face Swap verdict regardless of score
+    if original_verdict in ["Face Swap", "Deepfake"]:
+        return original_verdict
+
     score = int(score)
     if score >= 90:
         return "AI Generated Proof"
@@ -222,7 +314,9 @@ def merge_results(r_gemini: dict, r_groq: dict) -> dict:
         return {
             "error": f"Both APIs failed — Gemini: {r_gemini.get('error')}, Groq: {r_groq.get('error')}",
             "verdict": "Error",
-            "confidence_score": 0
+            "confidence_score": 0,
+            "face_swap_detected": False,
+            "face_swap_confidence": 0
         }
 
     # Only one succeeded — return it directly
@@ -244,11 +338,21 @@ def merge_results(r_gemini: dict, r_groq: dict) -> dict:
     verdict_g = r_gemini.get("verdict", "Uncertain")
     verdict_q = r_groq.get("verdict", "Uncertain")
 
+    # Face swap fusion — if EITHER model detected it, flag it
+    fs_detected_g = bool(r_gemini.get("face_swap_detected", False))
+    fs_detected_q = bool(r_groq.get("face_swap_detected", False))
+    fused_face_swap = fs_detected_g or fs_detected_q
+    fs_conf_g = int(r_gemini.get("face_swap_confidence", 0))
+    fs_conf_q = int(r_groq.get("face_swap_confidence", 0))
+    fused_fs_confidence = max(fs_conf_g, fs_conf_q)
+
     if verdict_g == verdict_q:
         fused_verdict = verdict_g
     else:
-        # Pick higher-confidence verdict; tie → Uncertain
-        if abs(score_g - score_q) <= 10:
+        # Prioritize Face Swap verdict if either detected it
+        if "Face Swap" in [verdict_g, verdict_q]:
+            fused_verdict = "Face Swap"
+        elif abs(score_g - score_q) <= 10:
             fused_verdict = "Uncertain"
         elif score_g > score_q:
             fused_verdict = verdict_g
@@ -273,8 +377,6 @@ def merge_results(r_gemini: dict, r_groq: dict) -> dict:
         val_q = fp_q.get(k, "")
         merged_fp[k] = val_g if len(val_g) >= len(val_q) else val_q
 
-    # Refine forensic_points — prefer the one with longer text per key
-
     # Override if both systems agree on a specific high-confidence verdict
     if verdict_g == verdict_q and score_g > 80 and score_q > 80:
         fused_verdict = verdict_g
@@ -287,12 +389,18 @@ def merge_results(r_gemini: dict, r_groq: dict) -> dict:
     exp_q = r_groq.get("explanation", "")
     disagreement = ""
     if verdict_g != verdict_q:
-        disagreement = f" [Note: Gemini classified as '{verdict_g}' ({score_g}%) while Groq classified as '{verdict_q}' ({score_q}%) — verdict resolved to '{fused_verdict}'.]"
+        disagreement = f" [Note: Gemini classified as '{verdict_g}' ({score_g}%) while Groq classified as '{verdict_q}' ({score_q}%) — verdict resolved to '{fused_verdict}'.] "
     fused_explanation = f"{exp_g}{disagreement}"
+
+    # Add face swap note if detected
+    if fused_face_swap:
+        fused_explanation += f" ⚠ Face Swap indicators detected (confidence: {fused_fs_confidence}%)."
 
     return {
         "verdict": fused_verdict,
         "confidence_score": fused_score,
+        "face_swap_detected": fused_face_swap,
+        "face_swap_confidence": fused_fs_confidence,
         "forensic_points": merged_fp,
         "key_red_flags": red_flags,
         "key_authentic_signals": auth_signals,
@@ -318,8 +426,8 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
     t_start = time.time()
 
     if mode == "gemini":
-        result = analyze_gemini(gemini_key, image_path)
-        result["_sources_used"] = ["Gemini 2.0 Flash"]
+        result = analyze_gemini(gemini_key, image_path, openrouter_key)
+        result["_sources_used"] = [result.get("_source", "Gemini 2.0 Flash")]
     elif mode == "groq":
         result = analyze_groq(groq_key, image_path)
         result["_sources_used"] = ["Groq Llama-4 Scout"]
@@ -327,15 +435,15 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
         result = analyze_openrouter(openrouter_key, image_path)
         result["_sources_used"] = ["OpenRouter"]
     else:
-        # Fusion: run Gemini and Groq in parallel (keeping existing core fusion)
+        # Fusion: run Gemini and Groq in parallel
         with ThreadPoolExecutor(max_workers=2) as executor:
-            future_gemini = executor.submit(analyze_gemini, gemini_key, image_path)
+            future_gemini = executor.submit(analyze_gemini, gemini_key, image_path, openrouter_key)
             future_groq   = executor.submit(analyze_groq,   groq_key,   image_path)
 
             r_gemini = {"error": "Timeout"}
             r_groq   = {"error": "Timeout"}
 
-            for future in as_completed([future_gemini, future_groq], timeout=90):
+            for future in as_completed([future_gemini, future_groq], timeout=120):
                 if future == future_gemini:
                     r_gemini = future.result()
                 else:
@@ -343,7 +451,11 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
 
         result = merge_results(r_gemini, r_groq)
 
-    # 4. Global Refinement (Applies even to single-provider modes)
+    # Post-process: face swap detection (applies to all modes)
+    if "error" not in result:
+        result = post_process_face_swap(result)
+
+    # Global verdict refinement
     if "confidence_score" in result:
         result["verdict"] = refine_verdict(result["confidence_score"], result.get("verdict", ""))
 
@@ -353,7 +465,6 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
 
 
 if __name__ == "__main__":
-    # Redirect non-JSON prints to stderr so Node.js only gets clean JSON
     import sys as _sys
 
     if len(_sys.argv) < 5:

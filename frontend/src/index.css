@@ -1,48 +1,49 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
-  /* --- Deep Void Tones --- */
   --bg-void:    #020204;
   --bg-deep:    #05050a;
   --bg-surface: rgba(10, 10, 18, 0.7);
-  
-  /* --- Vivid Accents (Neon Palette) --- */
-  --accent-primary:   #6366f1; /* Indigo */
-  --accent-secondary: #a855f7; /* Purple */
-  --accent-vivid:     #ec4899; /* Pink/Magenta */
-  --accent-cyan:      #06b6d4; /* Electric Cyan */
-  
-  /* --- Feedback Colors --- */
+
+  --accent-primary:   #6366f1;
+  --accent-secondary: #a855f7;
+  --accent-vivid:     #ec4899;
+  --accent-cyan:      #06b6d4;
+
   --success: #10b981;
-  --danger: #ef4444;
+  --danger:  #ef4444;
   --warning: #f59e0b;
-  
-  /* --- Standard Text --- */
+
   --text-primary:   #ffffff;
-  --text-secondary: #cbd5e1; /* Louder Slate */
-  --text-muted:     #94a3b8; /* Visible Slate */
-  
-  /* --- Glassmorphism Kit --- */
-  --glass-bg:      rgba(15, 15, 25, 0.6);
-  --glass-border:  rgba(255, 255, 255, 0.08);
-  --glass-shadow:  0 8px 32px 0 rgba(0, 0, 0, 0.8), 
-                   inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --glass-glow:    0 0 20px rgba(99, 102, 241, 0.15);
-  
-  /* --- Transitions & Radii --- */
+  --text-secondary: #cbd5e1;
+  --text-muted:     #94a3b8;
+
+  /* ── Solid glass (no blur = zero GPU overdraw on canvas) ── */
+  --glass-bg:     rgba(11, 11, 20, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.6),
+                  inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --glass-glow:   0 0 20px rgba(99, 102, 241, 0.1);
+
   --radius-xl: 32px;
   --radius-lg: 20px;
   --radius-md: 12px;
-  --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Fast transitions — snappy, not sluggish */
+  --transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* --- Base Reset --- */
-* {
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  /* Prevent subpixel font jank */
+  text-size-adjust: 100%;
 }
 
 body {
@@ -51,6 +52,9 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   overflow-x: hidden;
   min-height: 100vh;
+  /* Single compositing layer for ALL page content */
+  transform: translateZ(0);
+  contain: layout style;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -64,31 +68,38 @@ code, pre, .mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* --- UI Primitives --- */
-
+/* ─── Glass — NO backdrop-filter, solid dark only ────────────────────────── */
+/*
+   WHY: backdrop-filter:blur on top of WebGL forces the browser to
+   composite and blur the live canvas framebuffer every single frame
+   for every glass element. This is the #1 source of UI lag.
+   Solid dark bg is visually indistinguishable at high opacity.
+*/
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(24px) saturate(200%);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: var(--radius-lg);
   position: relative;
   overflow: hidden;
+  /* Own compositing layer so children don't cause parent repaints */
+  contain: layout;
 }
 
 .glass-card {
-  transition: var(--transition);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  will-change: transform;
 }
 
 .glass-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  border-color: rgba(99, 102, 241, 0.4);
-  background: rgba(20, 20, 35, 0.7);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), var(--glass-glow);
+  transform: translate3d(0, -5px, 0);
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), var(--glass-glow);
 }
 
+/* ─── Text Gradients ─────────────────────────────────────────────────────── */
 .gradient-text {
   background: linear-gradient(135deg, #fff 0%, var(--accent-primary) 50%, var(--accent-secondary) 100%);
   -webkit-background-clip: text;
@@ -105,15 +116,15 @@ code, pre, .mono {
   color: transparent;
 }
 
-/* --- Buttons --- */
-
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
 .btn {
   padding: 1rem 2rem;
   border-radius: var(--radius-md);
   font-weight: 700;
   font-family: 'Outfit', sans-serif;
   cursor: pointer;
-  transition: var(--transition);
+  /* Only animate transform + box-shadow — both GPU composited */
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   border: none;
   display: inline-flex;
   align-items: center;
@@ -123,63 +134,115 @@ code, pre, .mono {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.85rem;
+  user-select: none;
+  will-change: transform;
 }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   color: white;
-  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6);
+.btn-primary:hover:not(:disabled) {
+  transform: translate3d(0, -2px, 0);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translate3d(0, 0px, 0);
 }
 
 .btn-outline {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   color: var(--text-primary);
 }
 
 .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(99, 102, 241, 0.4);
+  transform: translate3d(0, -2px, 0);
 }
 
-/* --- Inputs --- */
-
+/* ─── Inputs ─────────────────────────────────────────────────────────────── */
 .neural-input {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 1.25rem 1.5rem;
   border-radius: var(--radius-md);
   color: white;
   font-family: 'JetBrains Mono', monospace;
   width: 100%;
-  transition: var(--transition);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   outline: none;
 }
 
 .neural-input:focus {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
-  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.15);
+  background: rgba(0, 0, 0, 0.55);
 }
 
-/* --- Animations --- */
+/* ─── Scan Line — composited via transform only ───────────────────────────── */
+.scan-line {
+  position: absolute;
+  top: 0; left: 0;
+  width: 60%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.5), transparent);
+  animation: scan-sweep 3.5s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
 
+@keyframes scan-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+
+/* ─── Neon Pulse — box-shadow only, fast ─────────────────────────────────── */
 @keyframes neon-pulse {
-  0% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.4); }
-  50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8), 0 0 40px rgba(168, 85, 247, 0.4); }
-  100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.4); }
+  0%, 100% { box-shadow: 0 0 4px rgba(99, 102, 241, 0.3); }
+  50%       { box-shadow: 0 0 12px rgba(99, 102, 241, 0.6), 0 0 24px rgba(168, 85, 247, 0.25); }
 }
 
 .neon-glow {
-  animation: neon-pulse 2s infinite;
+  animation: neon-pulse 2.5s ease-in-out infinite;
 }
 
-/* --- Page Transitions --- */
+/* ─── Shimmer — transform only, GPU composited ───────────────────────────── */
+.shimmer { position: relative; overflow: hidden; }
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.03) 50%,
+    transparent 60%
+  );
+  animation: shimmer-sweep 3s ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-200%); }
+  100% { transform: translateX(300%); }
+}
+
+/* ─── Spin ───────────────────────────────────────────────────────────────── */
+.animate-spin {
+  animation: spin 0.75s linear infinite;
+  will-change: transform;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
 .app-container {
   min-height: 100vh;
   width: 100%;
@@ -187,28 +250,42 @@ code, pre, .mono {
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  /* Stacking context isolated from the WebGL canvas below */
+  isolation: isolate;
 }
 
 .page-container {
-  padding: 8rem 2rem 4rem;
+  padding: 7rem 2rem 4rem;
   max-width: 1300px;
   margin: 0 auto;
   width: 100%;
 }
 
-.shimmer {
-  position: relative;
-  overflow: hidden;
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.25);
+  border-radius: 99px;
 }
-.shimmer::after {
-  content: '';
-  position: absolute;
-  top: 0; left: -150%;
-  width: 150%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-  animation: shimmer-load 2s infinite;
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.45);
 }
-@keyframes shimmer-load {
-  0% { left: -150%; }
-  100% { left: 150%; }
+
+/* ─── Selection ──────────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(99, 102, 241, 0.28);
+  color: white;
 }
+
+/* ─── Face Swap Badge Animations (CSS-only, zero JS) ────────────────────── */
+@keyframes fsFade {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 0.7; }
+}
+
+@keyframes fsPulse {
+  0%, 100% { transform: scale(1);    opacity: 0.8; }
+  50%       { transform: scale(1.12); opacity: 1;   }
+}
+

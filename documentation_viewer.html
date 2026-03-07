@@ -13,6 +13,8 @@
             --accent-primary: #6366f1;
             --accent-secondary: #a855f7;
             --accent-cyan: #06b6d4;
+            --accent-amber: #f59e0b;
+            --accent-rose: #ff3d71;
             --text-primary: #ffffff;
             --text-secondary: #a1a1aa;
             --text-muted: #525252;
@@ -62,6 +64,22 @@
             font-size: 1.1rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto;
         }
 
+        /* --- Nav --- */
+        .doc-nav {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+            margin-bottom: 4rem;
+        }
+        .doc-nav a {
+            padding: 0.4rem 1rem; border-radius: 999px;
+            border: 1px solid var(--glass-border);
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 0.72rem; font-weight: 700; letter-spacing: 1px;
+            transition: var(--transition);
+        }
+        .doc-nav a:hover {
+            background: rgba(99,102,241,0.1); border-color: var(--accent-primary); color: white;
+        }
+
         /* --- Section Styling --- */
         section {
             margin-bottom: 8rem; opacity: 0; transform: translateY(30px);
@@ -75,8 +93,10 @@
             margin-bottom: 3rem; display: flex; align-items: center; gap: 1rem;
         }
         h2::before {
-            content: ""; width: 40px; height: 2px; background: var(--accent-cyan);
+            content: ""; width: 40px; height: 2px; background: var(--accent-cyan); flex-shrink: 0;
         }
+        h2.amber-accent::before { background: var(--accent-amber); }
+        h2.rose-accent::before { background: var(--accent-rose); }
 
         .glass-card {
             background: var(--glass); border: 1px solid var(--glass-border);
@@ -96,22 +116,57 @@
 
         .feature-card {
             padding: 2rem; border-radius: 20px; background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--glass-border); transition: var(--transition);
+            border: 1px solid var(--glass-border); transition: var(--transition); position: relative;
         }
         .feature-card:hover {
             background: rgba(255, 255, 255, 0.04); transform: translateY(-5px);
             border-color: var(--accent-cyan);
         }
+        .feature-card.rose-card {
+            background: rgba(255, 61, 113, 0.04);
+            border-color: rgba(255, 61, 113, 0.25);
+        }
+        .feature-card.rose-card:hover { border-color: var(--accent-rose); }
+        .feature-card.amber-card {
+            background: rgba(245, 158, 11, 0.04);
+            border-color: rgba(245, 158, 11, 0.25);
+        }
+        .feature-card.amber-card:hover { border-color: var(--accent-amber); }
+
         .feature-card h3 {
             font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent-cyan);
             text-transform: uppercase; letter-spacing: 1px;
         }
+        .feature-card.rose-card h3 { color: var(--accent-rose); }
+        .feature-card.amber-card h3 { color: var(--accent-amber); }
         .feature-card p { font-size: 0.9rem; color: var(--text-secondary); }
+
+        /* --- Enterprise Badge --- */
+        .enterprise-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            color: #000; font-size: 0.6rem; font-weight: 900;
+            letter-spacing: 1px; padding: 2px 10px; border-radius: 99px;
+            margin-bottom: 10px; box-shadow: 0 0 16px rgba(245,158,11,0.4);
+        }
+
+        /* --- Face Swap Alert Box --- */
+        .face-swap-alert {
+            background: rgba(255, 61, 113, 0.07);
+            border: 1px solid rgba(255, 61, 113, 0.3);
+            border-radius: 16px; padding: 1.5rem 2rem;
+            display: flex; align-items: flex-start; gap: 1.2rem; margin: 2rem 0;
+        }
+        .face-swap-alert .alert-icon {
+            font-size: 1.8rem; flex-shrink: 0; line-height: 1;
+        }
+        .face-swap-alert h4 { color: var(--accent-rose); font-size: 0.9rem; letter-spacing: 1px; margin-bottom: 6px; }
+        .face-swap-alert p { font-size: 0.82rem; color: rgba(255,61,113,0.75); }
 
         /* --- List & Tables --- */
         ul { list-style: none; }
         li { margin-bottom: 1rem; display: flex; gap: 1rem; align-items: flex-start; }
-        li::before { content: "→"; color: var(--accent-cyan); font-weight: 900; }
+        li::before { content: "→"; color: var(--accent-cyan); font-weight: 900; flex-shrink: 0; }
 
         table {
             width: 100%; border-collapse: collapse; margin: 2rem 0;
@@ -125,6 +180,7 @@
             padding: 1.2rem; border-bottom: 1px solid var(--glass-border);
             color: var(--text-secondary);
         }
+        tr:hover td { background: rgba(255,255,255,0.02); }
 
         /* --- Code Blocks --- */
         code {
@@ -138,10 +194,20 @@
         pre code { background: none; padding: 0; color: #d4d4d8; font-size: 0.9rem; }
 
         .tag-success { color: var(--success); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; }
+        .tag-active { color: var(--accent-cyan); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; }
+        .tag-warning { color: var(--warning); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; }
+
+        .ext-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--accent-amber); text-decoration: none; font-size: 0.75rem; font-weight: 800;
+            background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2);
+            padding: 4px 12px; border-radius: 8px; transition: var(--transition);
+        }
+        .ext-link:hover { background: rgba(245,158,11,0.2); }
 
         @media (max-width: 768px) {
             h1 { font-size: 3rem; }
-            .grid-2 { grid-template-columns: 1fr; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
             .glass-card { padding: 1.5rem; }
         }
     </style>
@@ -152,11 +218,23 @@
 
     <div class="container">
         <header>
-            <div class="badge">SYNERGY PROTOCOL V1.0</div>
+            <div class="badge">SYNERGY PROTOCOL V2.0 — FACE SWAP ENGINE ACTIVE</div>
             <h1>AI Image Detector</h1>
-            <p class="subtitle">Neural Forensic Command for deep-level image veracity analysis using cross-API fusion matrix.</p>
+            <p class="subtitle">Neural Forensic Command for deep-level image veracity analysis using a 16-point cross-API fusion matrix — including dedicated Face Swap Detection.</p>
         </header>
 
+        <!-- Quick Nav -->
+        <nav class="doc-nav">
+            <a href="#roadmap">System Overview</a>
+            <a href="#faceswap">Face Swap Detection</a>
+            <a href="#enterprise">Enterprise: Gemini</a>
+            <a href="#installation">Installation</a>
+            <a href="#methodology">Methodology</a>
+            <a href="#api">Neural API Matrix</a>
+            <a href="#troubleshooting">Troubleshooting</a>
+        </nav>
+
+        <!-- ── SYSTEM OVERVIEW ─────────────────────────────────────────── -->
         <section id="roadmap">
             <h2>System Roadmap</h2>
             <div class="glass-card">
@@ -164,8 +242,10 @@
                     <div>
                         <h3 style="margin-bottom: 1.5rem; color: var(--accent-primary)">CORE CAPABILITIES</h3>
                         <ul>
-                            <li><strong>Multi-Provider Fusion</strong>: Supports Gemini 2.0 Flash, Groq Llama 3, and OpenRouter (DeepSeek/Grok) adapters.</li>
-                            <li><strong>Anatomical Engine</strong>: Dedicated logic for finger counts, eye symmetry, and ear positioning detection.</li>
+                            <li><strong>16-Point Forensic Analysis</strong>: Upgraded from 15 — Point 16 is dedicated Face Swap Detection.</li>
+                            <li><strong>Multi-Provider Fusion</strong>: Gemini 2.0 Flash, Groq Llama-4 Scout, and OpenRouter adapters running in parallel.</li>
+                            <li><strong>Gemini Rate-Limit Resilience</strong>: Exponential retry (1s→2s→4s, 3×) with auto-fallback to OpenRouter on exhaustion.</li>
+                            <li><strong>Anatomical Engine</strong>: Finger counts, eye symmetry, ear positioning, jawline continuity detection.</li>
                             <li><strong>Lighting Physics</strong>: Shadow alignment validation and detached shadow artifact identification.</li>
                             <li><strong>Session-Only Auth</strong>: AES-encrypted transient storage for API keys. Zero disk persistence.</li>
                         </ul>
@@ -175,14 +255,109 @@
                         <table>
                             <tr><td>Backend Bridge (Python 3.11)</td><td><span class="tag-success">STABLE</span></td></tr>
                             <tr><td>Frontend (Vite 5.0)</td><td><span class="tag-success">STABLE</span></td></tr>
-                            <tr><td>OpenRouter Adapter</td><td><span class="tag-success">ACTIVE</span></td></tr>
+                            <tr><td>OpenRouter Adapter</td><td><span class="tag-active">ACTIVE</span></td></tr>
+                            <tr><td>Face Swap Engine (Point 16)</td><td><span class="tag-active">ACTIVE</span></td></tr>
                             <tr><td>Forensic Score Fusion</td><td><span class="tag-success">VERIFIED</span></td></tr>
+                            <tr><td>Gemini Rate-Limit Retry</td><td><span class="tag-success">ENABLED</span></td></tr>
                         </table>
                     </div>
                 </div>
             </div>
         </section>
 
+        <!-- ── FACE SWAP DETECTION ─────────────────────────────────────── -->
+        <section id="faceswap">
+            <h2 class="rose-accent">⚠ Face Swap Detection</h2>
+
+            <div class="face-swap-alert">
+                <div class="alert-icon">🔍</div>
+                <div>
+                    <h4>POINT 16 — FACE SWAP FORENSIC SCAN</h4>
+                    <p>The engine now runs a dedicated sub-analysis (Forensic Point 16) specifically targeting face swap artifacts. This is in addition to all existing 15 forensic checks. When indicators are detected, a prominent "FACE SWAP DETECTED" alert appears in the UI with confidence score.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-3">
+                <div class="feature-card rose-card">
+                    <h3>Boundary Seam Analysis</h3>
+                    <p>Detects unnatural blending lines, halos, and color discontinuities along the face boundary, hairline boundary, and neck junction — the primary artifacts of face swap compositing.</p>
+                </div>
+                <div class="feature-card rose-card">
+                    <h3>Skin Tone Mismatch</h3>
+                    <p>Compares sub-surface scattering and skin hue between the face, neck, ears, and hands. Skin swap operations frequently leave detectable chrominance discrepancies.</p>
+                </div>
+                <div class="feature-card rose-card">
+                    <h3>Texture Inconsistency</h3>
+                    <p>A face with lower resolution/texture detail than the surrounding body is a strong face swap indicator. The engine checks texture frequency mismatch between facial and body regions.</p>
+                </div>
+                <div class="feature-card rose-card">
+                    <h3>Lighting Discrepancy</h3>
+                    <p>Detects when the light hitting the face originates from a different angle or temperature than the body illumination — a classic tell when compositing two separate source images.</p>
+                </div>
+                <div class="feature-card rose-card">
+                    <h3>Jawline & Ear Continuity</h3>
+                    <p>Checks for blending artifacts at the junction of the swapped face and the original ears or jaw. Unnatural blur isolation (blurry face on a sharp body) is also flagged.</p>
+                </div>
+                <div class="feature-card rose-card">
+                    <h3>Post-Processing Guard</h3>
+                    <p>The <code>post_process_face_swap()</code> function in <code>analyze.py</code> also scans all red flags and the face swap analysis text for known face swap keywords, providing a secondary detection pass.</p>
+                </div>
+            </div>
+
+            <div class="glass-card" style="margin-top: 2rem; border-color: rgba(255,61,113,0.2);">
+                <h3 style="color: var(--accent-rose); margin-bottom: 1.5rem;">Detection Verdicts</h3>
+                <table>
+                    <tr><th>Verdict</th><th>Meaning</th><th>UI Color</th></tr>
+                    <tr><td><code>Face Swap</code></td><td>Clear face swap indicators confirmed (seams, texture mismatch, etc.). face_swap_detected = true.</td><td style="color: #ff3d71;">■ Rose Red</td></tr>
+                    <tr><td><code>Deepfake</code></td><td>Full face synthesis / replacement (GAN-based). Verdict preserved, not overridden.</td><td style="color: #ef4444;">■ Danger Red</td></tr>
+                    <tr><td><code>AI Generated</code></td><td>Entire image is AI-generated. No real face present to swap.</td><td style="color: #ef4444;">■ Danger Red</td></tr>
+                    <tr><td><code>Verified Real</code></td><td>No face swap indicators. No AI generation artifacts.</td><td style="color: #10b981;">■ Green</td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- ── ENTERPRISE: GOOGLE GEMINI ──────────────────────────────── -->
+        <section id="enterprise">
+            <h2 class="amber-accent">⭐ Enterprise: Google Gemini</h2>
+            <div class="glass-card" style="border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.03);">
+                <div class="grid grid-2">
+                    <div>
+                        <div class="enterprise-badge">👑 ENTERPRISE RECOMMENDED</div>
+                        <h3 style="color: var(--accent-amber); margin-bottom: 1.5rem; font-size: 1.6rem; font-family: Outfit;">Google Gemini 2.0 Flash</h3>
+                        <p style="color: rgba(245,158,11,0.8); margin-bottom: 1.5rem; font-size: 0.95rem;">
+                            For professional and enterprise forensic workloads, <strong>Google Gemini 2.0 Flash</strong> is the recommended provider. It delivers the highest multimodal vision accuracy, handles complex face swap boundary analysis most reliably, and scales to production volumes via Google AI Studio subscriptions.
+                        </p>
+                        <ul>
+                            <li>Best-in-class multimodal image understanding for forensic detail</li>
+                            <li>16-point face swap checklist adherence is most consistent with Gemini</li>
+                            <li>Enterprise-grade SLA via Google AI Studio paid tiers</li>
+                            <li>Rate-limit resilience built-in (3× retry + OpenRouter fallback)</li>
+                        </ul>
+                        <div style="margin-top: 2rem;">
+                            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="ext-link">
+                                🔑 Get Enterprise API Key → Google AI Studio
+                            </a>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="margin-bottom: 1.5rem; color: var(--accent-amber)">TIER COMPARISON</h3>
+                        <table>
+                            <tr><th>Tier</th><th>Best For</th><th>Rate Limit</th></tr>
+                            <tr><td>Free Tier</td><td>Development / Testing</td><td>15 RPM (low)</td></tr>
+                            <tr><td>Pay-as-you-go</td><td>Small teams / Startups</td><td>1500 RPM</td></tr>
+                            <tr><td>Enterprise</td><td>Production / High-volume</td><td>Custom / Unlimited</td></tr>
+                        </table>
+                        <div style="margin-top: 1.5rem; padding: 1.2rem; border-radius: 12px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2);">
+                            <p style="font-size: 0.8rem; color: rgba(245,158,11,0.8); line-height: 1.6;">
+                                <strong style="color: #f59e0b;">ℹ Rate-Limit Note:</strong> The engine automatically retries Gemini on 429 errors (3× with exponential backoff: 1s → 2s → 4s). If exhausted, it auto-falls back to OpenRouter. Monitor backend console for <code style="color: #f59e0b;">[GEMINI_RATE_LIMIT]</code> messages.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── INSTALLATION ───────────────────────────────────────────── -->
         <section id="installation">
             <h2>Installation Guide</h2>
             <div class="glass-card">
@@ -193,24 +368,39 @@
                 <pre><code>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code></pre>
 
                 <h3 style="margin-top: 2.5rem; margin-bottom: 1rem; color: var(--accent-cyan)">2. Dependency Provisioning</h3>
-                <pre><code># Root folder (Installs concurrently for Node)
+                <pre><code># Root folder (Node.js — Express API + Vite frontend)
 npm install
 
-# Backend folder (Python dependencies)
-pip install google-generativeai groq requests</code></pre>
+# Backend Python engine — use requirements.txt for exact versions:
+pip install -r backend/requirements.txt
+
+# Or install manually:
+pip install google-generativeai groq requests python-docx Pillow</code></pre>
 
                 <h3 style="margin-top: 2.5rem; margin-bottom: 1rem; color: var(--accent-cyan)">3. Neural Launch</h3>
                 <p>Start the forensic lab in dev mode. Concurrently boots both Express and Vite servers.</p>
                 <pre><code>npm run dev</code></pre>
+
+                <h3 style="margin-top: 2.5rem; margin-bottom: 1rem; color: var(--accent-cyan)">4. API Key Setup</h3>
+                <ul>
+                    <li><strong>Gemini (Enterprise):</strong> Visit <a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--accent-amber);">aistudio.google.com/apikey</a> — paid tier recommended for production.</li>
+                    <li><strong>Groq:</strong> Visit <a href="https://console.groq.com" target="_blank" style="color: var(--accent-cyan);">console.groq.com</a> — free tier available, excellent for speed.</li>
+                    <li><strong>OpenRouter:</strong> Visit <a href="https://openrouter.ai" target="_blank" style="color: var(--accent-primary);">openrouter.ai</a> — acts as fallback gateway.</li>
+                </ul>
             </div>
         </section>
 
+        <!-- ── FORENSIC METHODOLOGY ───────────────────────────────────── -->
         <section id="methodology">
             <h2>Forensic Methodology</h2>
-            <div class="grid grid-2">
+            <div class="grid grid-3">
+                <div class="feature-card rose-card">
+                    <h3>Face Swap Detection</h3>
+                    <p>Point 16 of the forensic checklist. Detects boundary seams, skin tone mismatches, texture inconsistencies, lighting direction discrepancies, and jawline blending artifacts specific to face swap compositing techniques.</p>
+                </div>
                 <div class="feature-card">
                     <h3>Anatomical Logic</h3>
-                    <p>AI generators often hallucinate extra digits or skewed joints. The engine inspects finger articulation, pupillary symmetry, and ear placement consistency.</p>
+                    <p>AI generators hallucinate extra digits or skewed joints. The engine inspects finger articulation, pupillary symmetry, and ear placement consistency.</p>
                 </div>
                 <div class="feature-card">
                     <h3>Lighting Physics</h3>
@@ -224,34 +414,43 @@ pip install google-generativeai groq requests</code></pre>
                     <h3>Edge Consistency</h3>
                     <p>Zooms in on fine details like hair strands. Detects the 'waxy/plastic' sheen or unnatural sharpness characteristic of AI upscaling and smoothing.</p>
                 </div>
+                <div class="feature-card">
+                    <h3>GAN / Diffusion Signatures</h3>
+                    <p>Frequency domain anomalies, checkerboard patterns, and repetitive "pixel-perfect" noise characteristic of StyleGAN, ProGAN, Stable Diffusion, and DALL-E artifacts.</p>
+                </div>
             </div>
         </section>
 
+        <!-- ── NEURAL API MATRIX ──────────────────────────────────────── -->
         <section id="api">
             <h2>Neural API Matrix</h2>
             <div class="glass-card">
-                <p style="margin-bottom: 2rem;">Unified interface for cross-model verification.</p>
+                <p style="margin-bottom: 2rem;">Unified interface for cross-model verification. All providers share the same 16-point forensic prompt.</p>
                 <div class="grid grid-3" id="api-grid">
                     <!-- Dynamic Grid Items -->
                 </div>
             </div>
         </section>
 
+        <!-- ── TROUBLESHOOTING ────────────────────────────────────────── -->
         <section id="troubleshooting">
             <h2>Troubleshooting</h2>
             <div class="glass-card" style="border-color: var(--warning)">
                 <ul>
                     <li><strong>ECONNREFUSED</strong>: Ensure your backend is running on <code>localhost:8301</code>. Check terminal for Node.js errors.</li>
                     <li><strong>API Auth Failed</strong>: Tokens are case-sensitive. Verify provider selection (Gemini vs Groq vs OpenRouter).</li>
+                    <li><strong>Gemini 429 / Rate Limit</strong>: The engine automatically retries 3× with exponential backoff (1s → 2s → 4s), then falls back to OpenRouter if a key is available. Watch backend console for <code>[GEMINI_RATE_LIMIT]</code> messages. For persistent rate limits, upgrade to a paid Google AI Studio tier.</li>
+                    <li><strong>Face Swap Not Detected</strong>: The engine only flags face swap when CONCRETE evidence exists. If you believe a swap is present, try running in Gemini-only mode for highest detection accuracy.</li>
                     <li><strong>Python Not Found</strong>: If <code>python</code> fails, update <code>server.js</code> line 14 to <code>'python3'</code> for macOS/Linux users.</li>
                     <li><strong>Upload Limit</strong>: Maximum file size is 50MB. High-res TIFFs should be converted to JPG/PNG for faster analysis.</li>
+                    <li><strong>Report Download Fails</strong>: Ensure <code>python-docx</code> and <code>Pillow</code> are installed: <code>pip install python-docx Pillow</code></li>
                 </ul>
             </div>
         </section>
     </div>
 
     <script>
-        // --- Neural Background Background ---
+        // --- Neural Background ---
         const canvas = document.getElementById('neural-canvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
@@ -269,6 +468,7 @@ pip install google-generativeai groq requests</code></pre>
                 this.vx = (Math.random() - 0.5) * 0.4;
                 this.vy = (Math.random() - 0.5) * 0.4;
                 this.size = Math.random() * 2;
+                this.hue = Math.random() > 0.85 ? 335 : Math.random() > 0.5 ? 240 : 190; // rose / indigo / cyan
             }
             update() {
                 this.x += this.vx; this.y += this.vy;
@@ -276,7 +476,7 @@ pip install google-generativeai groq requests</code></pre>
                 if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
             }
             draw() {
-                ctx.fillStyle = 'rgba(99, 102, 241, 0.5)';
+                ctx.fillStyle = `hsla(${this.hue}, 80%, 65%, 0.5)`;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fill();
@@ -285,7 +485,7 @@ pip install google-generativeai groq requests</code></pre>
 
         function init() {
             particles = [];
-            for (let i = 0; i < 60; i++) particles.push(new Particle());
+            for (let i = 0; i < 70; i++) particles.push(new Particle());
         }
 
         function animate() {
@@ -294,9 +494,9 @@ pip install google-generativeai groq requests</code></pre>
                 p.update(); p.draw();
                 particles.forEach(p2 => {
                     const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
-                    if (dist < 150) {
-                        ctx.strokeStyle = `rgba(99, 102, 241, ${1 - dist/150})`;
-                        ctx.lineWidth = 0.5;
+                    if (dist < 140) {
+                        ctx.strokeStyle = `rgba(99, 102, 241, ${1 - dist/140})`;
+                        ctx.lineWidth = 0.4;
                         ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
                     }
                 });
@@ -307,30 +507,52 @@ pip install google-generativeai groq requests</code></pre>
         window.addEventListener('resize', resize);
         resize(); animate();
 
-        // --- Scroll Revel ---
+        // --- Scroll Reveal ---
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) entry.target.classList.add('visible');
             });
-        }, { threshold: 0.1 });
+        }, { threshold: 0.05 });
 
         document.querySelectorAll('section').forEach(s => observer.observe(s));
 
         // --- API Grid Data ---
         const API_MAP = [
-            { provider: 'GEMINI 2.0', model: 'gemini-2.0-flash', usage: 'Primary Vision Core' },
-            { provider: 'GROQ LLAMA', model: 'llama-4-scout-17b', usage: 'Speed Inference' },
-            { provider: 'OPENROUTER', model: 'google/gemini-2.0-flash', usage: 'Fallback Gateway' }
+            { 
+                provider: 'GEMINI 2.0 ⭐', 
+                model: 'gemini-2.0-flash', 
+                usage: 'Primary Vision Core — Enterprise Recommended',
+                color: '#f59e0b',
+                badge: 'ENTERPRISE',
+                link: 'https://aistudio.google.com/apikey'
+            },
+            { 
+                provider: 'GROQ LLAMA-4', 
+                model: 'llama-4-scout-17b', 
+                usage: 'Speed Inference — Free Tier Available',
+                color: '#06b6d4'
+            },
+            { 
+                provider: 'OPENROUTER', 
+                model: 'google/gemini-2.0-flash', 
+                usage: 'Fallback Gateway + Multi-Model Access',
+                color: '#6366f1'
+            }
         ];
 
         const apiGrid = document.getElementById('api-grid');
         API_MAP.forEach(api => {
             const div = document.createElement('div');
             div.className = 'feature-card';
+            div.style.cssText = `border-color: ${api.color}30;`;
             div.innerHTML = `
-                <div style="font-size: 0.6rem; color: var(--accent-primary); font-weight: 800; letter-spacing: 2px; margin-bottom: 0.5rem">${api.provider}</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom: 0.8rem;">
+                    <div style="font-size: 0.55rem; color: ${api.color}; font-weight: 900; letter-spacing: 2px;">${api.provider}</div>
+                    ${api.badge ? `<div style="font-size:0.5rem; background:${api.color}; color:#000; padding:1px 7px; border-radius:99px; font-weight:900; letter-spacing:1px;">${api.badge}</div>` : ''}
+                </div>
                 <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: #fff">${api.model}</h3>
-                <p>${api.usage}</p>
+                <p style="font-size:0.82rem;">${api.usage}</p>
+                ${api.link ? `<a href="${api.link}" target="_blank" rel="noopener noreferrer" class="ext-link" style="margin-top:10px; display:inline-flex; font-size:0.6rem;">🔑 Get Enterprise Key →</a>` : ''}
             `;
             apiGrid.appendChild(div);
         });
