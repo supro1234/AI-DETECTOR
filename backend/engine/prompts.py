@@ -53,8 +53,9 @@ Before anything else, do a DEDICATED face swap scan:
 - 0-19%: Verified Real (Raw sensor characteristics, natural sensor noise present).
 
 ━━━ VERDICT RULES ━━━
-If face_swap_detected = true AND face_swap_confidence >= 50, your verdict MUST be "Face Swap".
-Otherwise choose from: "Real" | "AI Generated" | "Deepfake" | "Face Swap" | "Uncertain"
+If face_swap_detected = true AND face_swap_confidence >= 85, your verdict MUST be "Face Swap".
+Otherwise choose from: "Verified Real" | "Likely Real" | "AI Camera / Enhanced" | "Highly Suspicious" | "AI Generated Proof" | "Face Swap"
+Note: Portrait mode / AI Camera enhancements often trigger 3+ face swap indicators (skin smoothing, depth blur). If you believe this is just an AI-enhanced photo of a real person, your verdict MUST be "AI Camera / Enhanced", NOT "Face Swap", and face_swap_confidence should realistically be 40-70%.
 
 ━━━ RESPONSE FORMAT (JSON ONLY, NO MARKDOWN) ━━━
 
@@ -102,7 +103,7 @@ Rules:
 - Average the confidence scores (weight equally)
 - If verdicts differ, choose the one with higher confidence, or "Uncertain" if tied within 10 points
 - If EITHER system detected a face swap, set face_swap_detected = true and use the HIGHER face_swap_confidence
-- If face_swap_detected = true and face_swap_confidence >= 50, the final verdict MUST be "Face Swap"
+- If face_swap_detected = true and face_swap_confidence >= 85, the final verdict MUST be "Face Swap"
 - Merge key_red_flags and key_authentic_signals (deduplicate)
 - Write a combined explanation noting any disagreements
 - Return JSON in the SAME format as the input results

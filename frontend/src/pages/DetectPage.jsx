@@ -6,7 +6,7 @@ import axios from 'axios'
 import confetti from 'canvas-confetti'
 
 // ── Confidence Ring ──────────────────────────────────────────────────────────
-const ConfidenceRing = ({ score, color }) => {
+const ConfidenceRing = ({ score, color, label }) => {
   const radius = 58
   const circumference = 2 * Math.PI * radius
   const pct = Math.min(Math.max(parseFloat(score) || 0, 0), 100)
@@ -30,7 +30,9 @@ const ConfidenceRing = ({ score, color }) => {
         <span style={{ fontSize: '2rem', fontWeight: 900, color, fontFamily: 'Outfit', lineHeight: 1 }}>
           {Math.round(pct)}%
         </span>
-        <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '2px', marginTop: '4px', fontWeight: 700 }}>VERACITY</span>
+        <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '2px', marginTop: '4px', fontWeight: 700 }}>
+          {label || 'AI CONF'}
+        </span>
       </div>
     </div>
   )
@@ -165,9 +167,11 @@ export default function DetectPage({ config, onReset }) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      if (config.provider === 'gemini')      formData.append('gemini_key', config.apiKey)
-      else if (config.provider === 'groq')   formData.append('groq_key', config.apiKey)
-      else if (config.provider === 'openrouter') formData.append('openrouter_key', config.apiKey)
+      // Always send all three keys — backend uses whichever are non-empty.
+      // This ensures OpenRouter-only users don't get silent failures in fusion mode.
+      formData.append('gemini_key',     config.provider === 'gemini'      ? config.apiKey : '')
+      formData.append('groq_key',       config.provider === 'groq'        ? config.apiKey : '')
+      formData.append('openrouter_key', config.provider === 'openrouter'  ? config.apiKey : '')
 
       const response = await axios.post(`${API_BASE}/api/analyze`, formData)
       clearInterval(stageIntervalRef.current)
@@ -511,7 +515,11 @@ export default function DetectPage({ config, onReset }) {
                   background: `rgba(${isFaceSwap ? '255,61,113' : isReal ? '16,185,129' : isEnhanced ? '245,158,11' : '239,68,68'}, 0.05)`
                 }}>
                   <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-                    <ConfidenceRing score={100 - result.confidence_score} color={vColor} />
+                    <ConfidenceRing 
+                      score={isReal || isEnhanced ? 100 - result.confidence_score : result.confidence_score} 
+                      color={vColor} 
+                      label={isReal || isEnhanced ? 'CONFIDENCE' : 'AI CONF'}
+                    />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.6rem' }}>
                         {isFaceSwap   ? <AlertTriangle size={22} color="#ff3d71" />
@@ -557,6 +565,7 @@ export default function DetectPage({ config, onReset }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {Object.entries(result.forensic_points).map(([key, value]) => {
                         if (!value) return null
+                        if (key === 'face_swap_analysis' && result.verdict !== 'Face Swap') return null
                         const isFsPoint = key === 'face_swap_analysis'
                         return (
                           <div

@@ -166,17 +166,18 @@ def _check_noise_residual(img_bgr: np.ndarray, face_roi) -> dict:
     if ratio < 0.75:
         base_score = min(90, int((1.0 - ratio) / 0.75 * 95))
         if whole_image_smooth:
-            # Whole image smooth: likely AI camera enhanced, halve the score
-            score = base_score // 2
+            # Whole image smooth: definitely AI camera enhanced / beauty filter
+            # Face swaps do not smooth the entire neck/body.
+            score = 0  # Zero it out. It's too ambiguous and causes false Face Swaps.
             detail = (
-                f"Mild noise difference — but neck ALSO smooth (neck={neck_n:.2f}), "
-                f"suggesting AI camera enhanced (not face swap). face={face_n:.2f} ratio={ratio:.2f}"
+                f"Face smoother than neck — but neck ALSO heavily smoothed (neck={neck_n:.2f}), "
+                f"suggesting Beauty Filter / Portrait Mode (not face swap). face={face_n:.2f} ratio={ratio:.2f}"
             )
         else:
             score = base_score
             detail = (
-                f"GFPGAN denoising: face_noise={face_n:.2f} neck={neck_n:.2f} "
-                f"ratio={ratio:.2f} — face is {(1-ratio)*100:.0f}% smoother than neck (swap signal)"
+                f"Selective denoising (e.g. GFPGAN): face_noise={face_n:.2f} neck={neck_n:.2f} "
+                f"ratio={ratio:.2f} — face is {(1-ratio)*100:.0f}% smoother than neck"
             )
     elif ratio < 0.88:
         score = 18
@@ -244,9 +245,10 @@ def _check_sharpness_mismatch(img_bgr: np.ndarray, face_roi) -> dict:
     if ratio > 2.2:
         # Face SHARPER than clothing: could be Portrait Mode (AI camera enhanced).
         # Portrait Mode sharpens face while blurring background/clothing.
-        # Lower score slightly since this direction is ambiguous.
-        score = min(60, int((ratio - 2.2) / 2.0 * 55 + 15))
-        detail = f"Face {ratio:.1f}x SHARPER than clothing — possible Portrait Mode or GFPGAN boost"
+        # This direction is completely ambiguous, so score must be 0 to prevent
+        # AI Camera images from being falsely flagged as Face Swaps.
+        score = 0
+        detail = f"Face {ratio:.1f}x SHARPER than clothing — normal for Portrait Mode / AI Camera"
     elif ratio < 0.38:
         # Face BLURRIER than clothing: strong face swap signal.
         # AI camera enhancement makes the WHOLE image sharp/processed —

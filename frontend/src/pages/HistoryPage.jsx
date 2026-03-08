@@ -179,7 +179,7 @@ export default function HistoryPage() {
                       />
                     </div>
                     <div className="neon-glow" style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '0.4rem 0.85rem', borderRadius: '6px', border: `1px solid ${vColor}` }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 900, color: vColor, letterSpacing: '1px' }}>{item.verdict.toUpperCase()}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 900, color: vColor, letterSpacing: '1px' }}>{(item.verdict || 'UNKNOWN').toUpperCase()}</span>
                     </div>
                   </div>
                 )}
