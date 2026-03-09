@@ -1,2 +1,4 @@
 node_modules
 backend/engine/__pycache__/local_faceswap_detector.cpython-310.pyc
+backend/engine/__pycache__/prompts.cpython-310.pyc
+backend/engine/__pycache__/analyze.cpython-310.pyc

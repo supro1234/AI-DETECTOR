@@ -532,7 +532,7 @@ export default function DetectPage({ config, onReset }) {
                         </h3>
                       </div>
                       <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', lineHeight: 1.6 }}>
-                        {result.explanation || 'Awaiting forensic synthesis...'}
+                        {result.error ? `API Error: ${result.error}` : (result.explanation || 'Awaiting forensic synthesis...')}
                       </p>
                       {result._fusion_note?.includes('rate-limit') && (
                         <div style={{ marginTop: '8px', fontSize: '0.65rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: '6px', padding: '4px 8px', border: '1px solid rgba(245,158,11,0.2)' }}>

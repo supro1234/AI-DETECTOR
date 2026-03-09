@@ -377,6 +377,13 @@ def run_local_faceswap_detection(image_path: str) -> dict:
         # because Portrait Mode also creates face/clothing sharpness difference.
 
         noise_whole_smooth = checks["noise_residual"].get("whole_image_smooth", False)
+        
+        # KEY FIX: If the whole image is smooth (beauty filter / AI enhancements), 
+        # heavily penalize the face swap confidence so it doesn't cross the override threshold
+        if noise_whole_smooth:
+            weighted_conf = int(weighted_conf * 0.4)
+            num_fired = max(0, num_fired - 1)
+            
         sharpness_ratio    = checks["sharpness_mismatch"].get("ratio", 1.0)
         sharpness_blurrier = sharpness_ratio < 0.38  # face blurrier = swap, not portrait
         max_score = max(scores.values()) if scores else 0

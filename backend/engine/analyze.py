@@ -287,7 +287,7 @@ def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool =
         return "AI Generated Proof"
     elif score >= 65:
         return "Highly Suspicious"
-    elif score >= 40:
+    elif score >= 50:
         return "AI Camera / Enhanced"
     elif score >= 18:
         return "Likely Real"
@@ -520,8 +520,8 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
                 f"Keeping AI verdict."
             )
 
-        # ── Rule C: AI uncertain/weak + local is highly confident ≥ 72% ──────────── #
-        elif local_detected and local_conf >= 72 and ai_verdict not in FULLY_AI_VERDICTS:
+        # ── Rule C: AI uncertain/weak + local is highly confident ≥ 60% ──────────── #
+        elif local_detected and local_conf >= 60 and ai_verdict not in FULLY_AI_VERDICTS:
             result["face_swap_detected"] = True
             result["face_swap_confidence"] = local_conf
             result["verdict"] = "Face Swap"
@@ -543,7 +543,7 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
         # ── Rule D: below threshold — ignore local, keep AI verdict ─────────── #
         else:
             result["_local_detector_note"] = (
-                f"Local confidence {local_conf}% below override thresholds (requires 72%) — AI verdict kept."
+                f"Local confidence {local_conf}% below override thresholds (requires 60%) — AI verdict kept."
             )
 
 
