@@ -59,8 +59,8 @@ const ModelBar = ({ label, score, color }) => (
 // ── Face Swap Alert ──────────────────────────────────────────────────────────
 const FaceSwapAlert = ({ confidence }) => (
   <motion.div
-    initial={{ opacity: 0, y: -8 }}
-    animate={{ opacity: 1, y: 0 }}
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.3, ease: 'easeOut' }}
     style={{
       background: 'rgba(255, 61, 113, 0.08)',
@@ -101,10 +101,53 @@ const FaceSwapAlert = ({ confidence }) => (
   </motion.div>
 )
 
+// ── Nudity Alert ─────────────────────────────────────────────────────────────
+const NudityAlert = ({ confidence }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.3, ease: 'easeOut' }}
+    style={{
+      background: 'rgba(255, 107, 107, 0.08)',
+      border: '1px solid rgba(255, 107, 107, 0.4)',
+      borderRadius: '16px', padding: '1.2rem 1.5rem',
+      display: 'flex', alignItems: 'center', gap: '1rem',
+      position: 'relative', overflow: 'hidden',
+    }}
+  >
+    <div style={{
+      width: '44px', height: '44px', borderRadius: '50%',
+      background: 'rgba(255,107,107,0.15)', border: '2px solid rgba(255,107,107,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
+      <ShieldAlert size={20} color="#ff6b6b" />
+    </div>
+    <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#ff6b6b', fontFamily: 'Outfit', letterSpacing: '1px', textTransform: 'uppercase' }}>
+          ⚠ NSFW / NUDITY CONTENT DETECTED
+        </span>
+        <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#000', background: '#ff6b6b', padding: '2px 8px', borderRadius: '99px', letterSpacing: '1px' }}>
+          {confidence}% CONF
+        </span>
+      </div>
+      <p style={{ fontSize: '0.72rem', color: 'rgba(255,107,107,0.75)', lineHeight: 1.4 }}>
+        Forensic neural scan identified explicit content. This media may violate standard safety guidelines.
+      </p>
+    </div>
+  </motion.div>
+)
+
 // ── Source Chips ─────────────────────────────────────────────────────────────
 const SourceChips = ({ sources }) => {
   if (!sources || sources.length === 0) return null
-  const iconMap = { 'Gemini 2.0 Flash': <Zap size={10} />, 'Groq Llama-4 Scout': <Cpu size={10} />, 'OpenRouter (Gemini 2.0)': <Shield size={10} />, 'OpenRouter': <Shield size={10} /> }
+  const iconMap = { 
+    'Gemini 2.0 Flash': <Zap size={10} />, 
+    'Groq Llama-4 Scout': <Cpu size={10} />, 
+    'OpenRouter (Gemini 2.0)': <Shield size={10} />, 
+    'OpenRouter': <Shield size={10} />,
+    'Hive AI': <Activity size={10} />
+  }
   return (
     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
       {sources.map(s => (
@@ -172,6 +215,9 @@ export default function DetectPage({ config, onReset }) {
       formData.append('gemini_key',     config.provider === 'gemini'      ? config.apiKey : '')
       formData.append('groq_key',       config.provider === 'groq'        ? config.apiKey : '')
       formData.append('openrouter_key', config.provider === 'openrouter'  ? config.apiKey : '')
+      formData.append('hive_access_key',config.hiveAccessKey || '')
+      formData.append('hive_secret_key',config.hiveSecretKey || '')
+      formData.append('mode', config.provider || 'fusion')
 
       const response = await axios.post(`${API_BASE}/api/analyze`, formData)
       clearInterval(stageIntervalRef.current)
@@ -229,10 +275,11 @@ export default function DetectPage({ config, onReset }) {
 
   const verdict    = result?.verdict?.toLowerCase() ?? ''
   const isReal     = verdict.includes('real')
-  const isEnhanced = verdict.includes('enhanced') || verdict.includes('suspicious')
+  const isEnhanced = verdict.includes('enhanced')
+  const isSuspicious = verdict.includes('suspicious')
   const isFaceSwap = result?.face_swap_detected === true || verdict.includes('face swap')
   const vColor     = result
-    ? (isFaceSwap ? '#ff3d71' : isReal ? 'var(--success)' : isEnhanced ? 'var(--warning)' : 'var(--danger)')
+    ? (isFaceSwap ? '#ff3d71' : isReal ? 'var(--success)' : (isSuspicious ? 'var(--danger)' : 'var(--warning)'))
     : 'var(--accent-primary)'
   const mb = result?.model_breakdown || {}
 
@@ -243,7 +290,10 @@ export default function DetectPage({ config, onReset }) {
     ear_nose_teeth: 'Ear/Nose/Teeth', compression: 'Compression', gan_diffusion: 'GAN/Diffusion',
     watermark_metadata: 'Watermark', text_in_image: 'Text in Image',
     reflections: 'Reflections', object_physics: 'Object Physics',
-    overall_coherence: 'Overall Coherence', face_swap_analysis: '⚠ Face Swap Analysis'
+    overall_coherence: 'Overall Coherence', face_swap_analysis: '⚠ Face Swap Analysis',
+    hive_natural: 'Hive Natural Texture', hive_animated: 'Hive Synthetic Signature',
+    hive_hybrid: 'Hive Hybrid Artifacts', hive_deepfake_signal: 'Hive Forensic Signal',
+    hive_nsfw_head: 'NSFW Content Detector', hive_suggestive: 'Suggestive Imagery Content'
   }
 
   return (
@@ -508,6 +558,9 @@ export default function DetectPage({ config, onReset }) {
                 {/* Face Swap Alert */}
                 {isFaceSwap && <FaceSwapAlert confidence={result.face_swap_confidence || 0} />}
 
+                {/* Nudity Alert */}
+                {result.nudity_detected && <NudityAlert confidence={result.nudity_confidence || 0} />}
+
                 {/* Verdict Card */}
                 <div className="glass" style={{
                   padding: '2rem',
@@ -516,9 +569,9 @@ export default function DetectPage({ config, onReset }) {
                 }}>
                   <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
                     <ConfidenceRing 
-                      score={isReal || isEnhanced ? 100 - result.confidence_score : result.confidence_score} 
+                      score={isReal ? 100 - result.confidence_score : result.confidence_score} 
                       color={vColor} 
-                      label={isReal || isEnhanced ? 'CONFIDENCE' : 'AI CONF'}
+                      label={isReal ? 'CONFIDENCE' : 'AI CONF'}
                     />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.6rem' }}>

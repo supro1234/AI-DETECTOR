@@ -6,15 +6,22 @@ import axios from 'axios'
 export default function SetupPage({ onConnect }) {
   const [provider, setProvider] = useState('gemini')
   const [apiKey, setApiKey] = useState('')
+  const [hiveAccessKey, setHiveAccessKey] = useState('')
+  const [hiveSecretKey, setHiveSecretKey] = useState('')
   const [showKey, setShowKey] = useState(false)
+  const [showHiveKey, setShowHiveKey] = useState(false)
   const [testing, setTesting] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
 
   const handleTestConnection = async () => {
-    if (!apiKey) {
-      setStatus({ type: 'error', message: 'CRITICAL: Neural Access Token Required' })
+    const isHive = provider === 'hive'
+    const tokenToTest = isHive ? hiveSecretKey : apiKey
+
+    if (!tokenToTest) {
+      setStatus({ type: 'error', message: `CRITICAL: ${isHive ? 'Hive Secret Key' : 'Neural Access Token'} Required` })
       return
     }
+
     setTesting(true)
     setStatus({ type: 'info', message: 'Synchronizing neural link...' })
 
@@ -23,24 +30,40 @@ export default function SetupPage({ onConnect }) {
       sessionStorage.removeItem('gemini_key')
       sessionStorage.removeItem('groq_key')
       sessionStorage.removeItem('openrouter_key')
+      sessionStorage.removeItem('hive_access_key')
+      sessionStorage.removeItem('hive_secret_key')
 
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8301';
       console.log(`[CONN_DEBUG] Requesting connection sync for: ${provider} at ${API_BASE}`);
+      
       const response = await axios.post(`${API_BASE}/api/test-connection`, { 
         provider, 
-        api_key: apiKey 
+        api_key: tokenToTest.trim(),
+        access_key: isHive ? hiveAccessKey.trim() : ''
       })
-      
+
       if (response.data.success) {
         console.log('[CONN_DEBUG] Connection verified by backend');
         setStatus({ type: 'success', message: 'SYNERGY ESTABLISHED. Accessing Laboratory...' })
-        sessionStorage.setItem(`${provider}_key`, apiKey)
+        
+        if (isHive) {
+          sessionStorage.setItem('hive_access_key', hiveAccessKey)
+          sessionStorage.setItem('hive_secret_key', hiveSecretKey)
+        } else {
+          sessionStorage.setItem(`${provider}_key`, apiKey)
+        }
         
         console.log('[CONN_DEBUG] Triggering onConnect transition');
-        onConnect({ provider, apiKey })
+        onConnect({ 
+          provider, 
+          apiKey: isHive ? hiveSecretKey : apiKey, 
+          hiveAccessKey: isHive ? hiveAccessKey : '', 
+          hiveSecretKey: isHive ? hiveSecretKey : '' 
+        })
       } else {
-        console.warn('[CONN_DEBUG] Backend rejected connection:', response.data.message);
-        setStatus({ type: 'error', message: response.data.message || 'LINK ARCHITECTURE REJECTED' })
+        const msg = response.data.message || 'LINK ARCHITECTURE REJECTED';
+        console.warn('[CONN_DEBUG] Backend rejected connection:', msg);
+        setStatus({ type: 'error', message: msg })
       }
     } catch (error) {
       console.error('[CONN_DEBUG] Error during connection sync:', error);
@@ -79,6 +102,15 @@ export default function SetupPage({ onConnect }) {
       icon: ShieldCheck, 
       color: 'var(--accent-primary)',
       enterprise: false
+    },
+    { 
+      id: 'hive', 
+      label: 'Hive AI', 
+      sub: 'Neural Forensics', 
+      icon: Zap, 
+      color: '#a855f7',
+      enterprise: false,
+      nsfw_sensor: true
     },
   ]
 
@@ -131,7 +163,7 @@ export default function SetupPage({ onConnect }) {
             <span style={{ fontSize:'0.75rem', fontWeight:800, color:'var(--text-secondary)', letterSpacing:'1px', textTransform:'uppercase' }}>INIT_PROVIDER</span>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem' }}>
             {providers.map(({ id, label, sub, icon: Icon, color, enterprise, enterpriseLabel, apiLink, apiLinkLabel }) => (
               <motion.div key={id} style={{ position: 'relative' }}>
                 {/* Enterprise Crown Badge */}
@@ -151,6 +183,26 @@ export default function SetupPage({ onConnect }) {
                   >
                     <Crown size={9} color="#000" />
                     <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#000', letterSpacing: '1px' }}>{enterpriseLabel}</span>
+                  </motion.div>
+                )}
+
+                {/* NSFW Sensor Badge */}
+                {providers.find(p => p.id === id)?.nsfw_sensor && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2, duration: 0.25 }}
+                    style={{
+                      position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)',
+                      zIndex: 10, background: 'rgba(168, 85, 247, 0.9)',
+                      borderRadius: '99px', padding: '2px 10px',
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                      boxShadow: '0 0 16px rgba(168, 85, 247, 0.4)',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <ShieldCheck size={9} color="white" />
+                    <span style={{ fontSize: '0.55rem', fontWeight: 900, color: 'white', letterSpacing: '1px' }}>HOT: NSFW SENSOR</span>
                   </motion.div>
                 )}
 
@@ -219,43 +271,118 @@ export default function SetupPage({ onConnect }) {
                 </a>
               </motion.div>
             )}
+
+            {provider === 'hive' && (
+              <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginTop: 14 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  overflow: 'hidden',
+                  borderRadius: '12px',
+                  background: 'rgba(168, 85, 247, 0.06)',
+                  border: '1px solid rgba(168, 85, 247, 0.2)',
+                  padding: '1rem 1.2rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <ShieldCheck size={13} color="#a855f7" fill="#a855f7" />
+                  <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#a855f7', letterSpacing: '1px' }}>PRIMARY SENSOR FOR NUDITY & DEEPFAKES</span>
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'rgba(168, 85, 247, 0.7)', lineHeight: 1.5, marginBottom: '8px' }}>
+                  Hive AI V3 Vesta is your highest-priority engine for NSFW/Nudity detection and Irrefutable Deepfake signatures. Essential for strict content safety auditing.
+                </p>
+                <a 
+                  href="https://dashboard.thehive.ai/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    fontSize: '0.65rem', fontWeight: 800, color: '#a855f7',
+                    textDecoration: 'none', letterSpacing: '1px',
+                    background: 'rgba(168, 85, 247, 0.12)', padding: '4px 10px',
+                    borderRadius: '6px', border: '1px solid rgba(168, 85, 247, 0.2)'
+                  }}
+                >
+                  <ExternalLink size={10} /> ACCESS HIVE DASHBOARD →
+                </a>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
-        {/* Access Token */}
+        {/* Access Token Input Logic */}
         <div style={{ marginBottom: '2.5rem' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-            <Key size={14} color="var(--accent-cyan)" />
-            <span style={{ fontSize:'0.75rem', fontWeight:800, color:'var(--text-secondary)', letterSpacing:'1px', textTransform:'uppercase' }}>AUTH_TOKEN</span>
+            {provider === 'hive' ? <Zap size={14} color="#a855f7" /> : <Key size={14} color="var(--accent-cyan)" />}
+            <span style={{ fontSize:'0.75rem', fontWeight:800, color:'var(--text-secondary)', letterSpacing:'1px', textTransform:'uppercase' }}>
+              {provider === 'hive' ? 'HIVE_V3_VESTA_LINK' : 'AUTH_TOKEN'}
+            </span>
           </div>
           
-          <div style={{ position: 'relative' }}>
-            <input
-              type={showKey ? 'text' : 'password'}
-              className="neural-input"
-              placeholder="ENTER API KEY"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
-            />
-            <button
-              onClick={() => setShowKey(v => !v)}
-              style={{ position: 'absolute', right: '1.2rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
-            >
-              {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
+          {provider === 'hive' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="neural-input"
+                  style={{ borderColor: hiveAccessKey ? '#a855f722' : undefined }}
+                  placeholder="HIVE ACCESS KEY ID"
+                  value={hiveAccessKey}
+                  onChange={(e) => setHiveAccessKey(e.target.value)}
+                />
+              </div>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showHiveKey ? 'text' : 'password'}
+                  className="neural-input"
+                  style={{ borderColor: hiveSecretKey ? '#a855f744' : undefined }}
+                  placeholder="HIVE SECRET KEY"
+                  value={hiveSecretKey}
+                  onChange={(e) => setHiveSecretKey(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
+                />
+                <button
+                  onClick={() => setShowHiveKey(v => !v)}
+                  style={{ position: 'absolute', right: '1.2rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                >
+                  {showHiveKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>
+                Using Hive V3 Playground Secret Key for advanced deepfake signals.
+              </p>
+            </div>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showKey ? 'text' : 'password'}
+                className="neural-input"
+                placeholder={`ENTER ${provider.toUpperCase()} API KEY`}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
+              />
+              <button
+                onClick={() => setShowKey(v => !v)}
+                style={{ position: 'absolute', right: '1.2rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          )}
         </div>
+
 
         {/* Action Button */}
         <button
-          className={`btn btn-primary shimmer ${testing || !apiKey ? 'disabled' : ''}`}
+          className={`btn btn-primary shimmer ${testing || (provider === 'hive' ? !hiveSecretKey : !apiKey) ? 'disabled' : ''}`}
           style={{ 
-            width: '100%', height: '60px', borderRadius: '12px', opacity: testing || !apiKey ? 0.6 : 1,
+            width: '100%', height: '60px', borderRadius: '12px', opacity: testing || (provider === 'hive' ? !hiveSecretKey : !apiKey) ? 0.6 : 1,
             background: provider === 'gemini' && apiKey ? 'linear-gradient(135deg, #f59e0b22, rgba(99,102,241,0.15))' : undefined,
             borderColor: provider === 'gemini' && apiKey ? '#f59e0b' : undefined,
           }}
-          disabled={testing || !apiKey}
+          disabled={testing || (provider === 'hive' ? !hiveSecretKey : !apiKey)}
           onClick={handleTestConnection}
         >
           {testing ? (

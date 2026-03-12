@@ -32,16 +32,22 @@ export default function App() {
     const gemini = sessionStorage.getItem('gemini_key')
     const groq   = sessionStorage.getItem('groq_key')
     const openrouter = sessionStorage.getItem('openrouter_key')
+    const hiveSecret = sessionStorage.getItem('hive_secret_key')
+    const hiveAccess = sessionStorage.getItem('hive_access_key')
+    const hiveKey = sessionStorage.getItem('hive_key')
     
     if (gemini) {
       console.log('[SESSION_DEBUG] Found Gemini key in storage');
-      setSession({ provider: 'gemini', apiKey: gemini })
+      setSession({ provider: 'gemini', apiKey: gemini, hiveAccessKey: hiveAccess, hiveSecretKey: hiveSecret })
     } else if (groq) {
       console.log('[SESSION_DEBUG] Found Groq key in storage');
-      setSession({ provider: 'groq', apiKey: groq })
+      setSession({ provider: 'groq', apiKey: groq, hiveAccessKey: hiveAccess, hiveSecretKey: hiveSecret })
     } else if (openrouter) {
       console.log('[SESSION_DEBUG] Found OpenRouter key in storage');
-      setSession({ provider: 'openrouter', apiKey: openrouter })
+      setSession({ provider: 'openrouter', apiKey: openrouter, hiveAccessKey: hiveAccess, hiveSecretKey: hiveSecret })
+    } else if (hiveKey || hiveSecret) {
+      console.log('[SESSION_DEBUG] Found Hive key in storage');
+      setSession({ provider: 'hive', apiKey: hiveKey || hiveSecret, hiveAccessKey: hiveAccess, hiveSecretKey: hiveSecret || hiveKey })
     } else {
       console.log('[SESSION_DEBUG] No existing session found');
     }

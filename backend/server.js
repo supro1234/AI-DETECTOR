@@ -61,10 +61,10 @@ const upload = multer({
 });
 
 // ─── Run Python analysis engine ───────────────────────────────────────────────
-function runEngine(geminiKey, groqKey, openrouterKey, imagePath, mode = 'fusion') {
+function runEngine(geminiKey, groqKey, openrouterKey, imagePath, mode = 'fusion', hiveKey = '') {
     return new Promise((resolve, reject) => {
         const script = path.join(__dirname, 'engine', 'analyze.py');
-        const args = [script, geminiKey || '', groqKey || '', openrouterKey || '', imagePath, mode];
+        const args = [script, geminiKey || '', groqKey || '', openrouterKey || '', imagePath, mode, hiveKey || ''];
 
         execFile(PYTHON, args, {
             maxBuffer: 10 * 1024 * 1024,
@@ -112,8 +112,12 @@ function generateModelBreakdown(confidence) {
 
 // ─── Test API Connection ──────────────────────────────────────────────────────
 app.post('/api/test-connection', async (req, res) => {
-    const { provider, api_key } = req.body;
-    console.log(`[AUTH_TEST] Initiating test for: ${provider}`);
+    let { provider, api_key, access_key } = req.body;
+    provider = provider?.trim().toLowerCase();
+    api_key = api_key?.trim();
+    access_key = access_key?.trim();
+    console.log(`[AUTH_TEST] Initiating test for: "${provider}"`);
+    console.log(`[AUTH_TEST] Request body:`, req.body);
     
     if (!api_key) return res.status(400).json({ success: false, message: 'API key is missing' });
 
@@ -132,8 +136,7 @@ app.post('/api/test-connection', async (req, res) => {
                 detail: r.data.choices?.[0]?.message?.content || 'CONNECTED'
             });
         }
-
-        if (provider === 'gemini') {
+        else if (provider === 'gemini') {
             const r = await axios.post(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${api_key}`,
                 { contents: [{ parts: [{ text: 'Respond with: CONNECTED' }] }] },
@@ -147,8 +150,7 @@ app.post('/api/test-connection', async (req, res) => {
                 detail: r.data.candidates?.[0]?.content?.parts?.[0]?.text || 'CONNECTED'
             });
         }
-
-        if (provider === 'openrouter') {
+        else if (provider === 'openrouter') {
             const r = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
                 messages: [{ role: 'user', content: 'Respond with: CONNECTED' }],
                 model: 'google/gemini-2.0-flash-001',
@@ -168,8 +170,46 @@ app.post('/api/test-connection', async (req, res) => {
                 detail: r.data.choices?.[0]?.message?.content || 'CONNECTED'
             });
         }
-
-        res.status(400).json({ success: false, message: 'Unsupported neural provider' });
+        else if (provider === 'hive') {
+            const accessKeyId = access_key || '';
+            console.log(`[AUTH_TEST] Attempting Hive V3 Vesta Link... KeyID: ${accessKeyId ? accessKeyId.slice(0, 4) + '...' : 'NONE'}`);
+            
+            const r = await axios.post('https://api.thehive.ai/api/v3/hive/visual-moderation', 
+                { input: [{ media_url: 'https://d24edro6ichpbm.thehive.ai/demo_static_media/nsfw/nsfw_4.jpg' }] }, 
+                { 
+                    headers: { 
+                        'Authorization': `Bearer ${api_key}`,
+                        ...(accessKeyId && { 'X-Hive-Key-Id': accessKeyId }),
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 10000 
+                }
+            ).catch(err => {
+                const hiveError = err.response?.data?.error?.message;
+                const status = err.response?.status;
+                console.error(`[AUTH_TEST_HIVE_FAIL] Status: ${status} | Error: ${hiveError || 'UNKNOWN'}`);
+                
+                // V3 check: 400/422 with media/input error means auth is good.
+                if ((status === 400 || status === 422) && (hiveError?.includes('media') || hiveError?.includes('provided') || hiveError?.includes('input'))) {
+                    return { status: 200, data: { success: true } };
+                }
+                throw err;
+            });
+            
+            console.log('[AUTH_TEST] Hive V3 response received (Bearer)');
+            return res.json({ 
+                success: true, 
+                message: 'HIVE_V3_SYNERGY_VERIFIED',
+                detail: 'CONNECTED'
+            });
+        }
+        else {
+            console.error(`[AUTH_TEST_ERROR] Unknown provider attempted: "${provider}"`);
+            return res.status(400).json({ 
+                success: false, 
+                message: `Unsupported neural provider: [${provider || 'NULL'}]` 
+            });
+        }
     } catch (e) {
         const errorMsg = e.response?.data?.error?.message || e.message;
         console.error(`[AUTH_TEST_FAILURE] ${provider}: ${errorMsg}`);
@@ -190,10 +230,19 @@ app.post('/api/analyze', (req, res) => {
         const file = req.file;
         if (!file) return res.status(400).json({ error: 'No file uploaded' });
 
-        const { gemini_key, groq_key, openrouter_key, mode = 'fusion' } = req.body;
+        let { gemini_key, groq_key, openrouter_key, hive_access_key, hive_secret_key, mode = 'fusion' } = req.body;
+        gemini_key = gemini_key?.trim();
+        groq_key = groq_key?.trim();
+        openrouter_key = openrouter_key?.trim();
+        hive_access_key = hive_access_key?.trim();
+        hive_secret_key = hive_secret_key?.trim();
+
+        const packedHiveKey = (hive_access_key || hive_secret_key) 
+            ? `${hive_access_key || ''}|${hive_secret_key || ''}` 
+            : '';
 
         try {
-            const result = await runEngine(gemini_key, groq_key, openrouter_key, file.path, mode);
+            const result = await runEngine(gemini_key, groq_key, openrouter_key, file.path, mode, packedHiveKey);
             result.model_breakdown = generateModelBreakdown(result.confidence_score);
             result.file_name = file.originalname;
             result.file_size = file.size;
@@ -211,7 +260,10 @@ app.post('/api/analyze', (req, res) => {
 
 // ─── Analyze Image by URL ─────────────────────────────────────────────────────
 app.post('/api/analyze-url', async (req, res) => {
-    const { url, gemini_key, groq_key, openrouter_key, mode = 'fusion' } = req.body;
+    const { url, gemini_key, groq_key, openrouter_key, hive_access_key, hive_secret_key, mode = 'fusion' } = req.body;
+    const packedHiveKey = (hive_access_key || hive_secret_key) 
+        ? `${hive_access_key || ''}|${hive_secret_key || ''}` 
+        : '';
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
     const dir = path.join(__dirname, 'uploads');
@@ -255,7 +307,7 @@ app.post('/api/analyze-url', async (req, res) => {
         tempPath = path.join(dir, `url_${Date.now()}${ext}`);
         fs.writeFileSync(tempPath, response.data);
 
-        const result = await runEngine(gemini_key, groq_key, openrouter_key, tempPath, mode);
+        const result = await runEngine(gemini_key, groq_key, openrouter_key, tempPath, mode, packedHiveKey);
         result.model_breakdown = generateModelBreakdown(result.confidence_score);
         result.file_name = url.split('/').pop().split('?')[0] || 'image';
         result.source_url = url;
