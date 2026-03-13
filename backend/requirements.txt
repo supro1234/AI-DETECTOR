@@ -1,0 +1,11 @@
+# AI Image Detector — Python Engine Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core AI Providers
+google-generativeai>=0.8.0      # Gemini 2.0 Flash (primary vision core)
+groq>=0.13.0                    # Groq Llama-4 Scout (speed inference)
+requests>=2.31.0                # OpenRouter HTTP calls + URL image download
+
+# Report Generation
+python-docx>=1.1.0              # DOCX/Word forensic report generation
+Pillow>=10.0.0                  # Image manipulation for report embedding

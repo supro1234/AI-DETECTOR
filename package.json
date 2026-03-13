@@ -1,0 +1,16 @@
+{
+  "name": "ai-image-detector",
+  "version": "1.0.0",
+  "description": "AI Image Detector — Neural Forensic Command (Face Swap, Deepfake, AI Detection)",
+  "scripts": {
+    "dev": "concurrently --names \"API,UI\" --prefix-colors \"cyan.bold,magenta.bold\" --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "start": "npm run dev",
+    "dev:backend": "cd backend && node server.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+
