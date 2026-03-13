@@ -52,6 +52,18 @@ except ImportError:
     LOCAL_DETECTOR_AVAILABLE = False
 
 try:
+    from forensic_metrics import calculate_npr, calculate_ufd, calculate_crossvit_proxy
+    FORENSIC_METRICS_AVAILABLE = True
+except ImportError:
+    FORENSIC_METRICS_AVAILABLE = False
+
+try:
+    from nsfw_detector import calculate_skin_score
+    NSFW_DETECTOR_AVAILABLE = True
+except ImportError:
+    NSFW_DETECTOR_AVAILABLE = False
+
+try:
     from background_detector import is_white_background
 except ImportError:
     is_white_background = lambda x: False
@@ -139,10 +151,12 @@ def analyze_gemini(api_key: str, image_path: str, openrouter_key: str = '') -> d
             
             # UI Bars consistent mapping
             naturalness = (100 - conf) / 100.0
+            # UI Bars consistent mapping
+            # Will be updated with real values in run_analysis
             result["model_breakdown"] = {
-                "npr": naturalness,
-                "ufd": naturalness,
-                "crossvit": naturalness
+                "npr": 0,
+                "ufd": 0,
+                "crossvit": 0
             }
 
             if attempt > 0:
@@ -222,10 +236,12 @@ def analyze_openrouter(api_key: str, image_path: str) -> dict:
         
         # Consistent UI bars
         naturalness = (100 - conf) / 100.0
+        # Consistent UI bars
+        # Will be updated with real values in run_analysis
         result["model_breakdown"] = {
-            "npr": naturalness,
-            "ufd": naturalness,
-            "crossvit": naturalness
+            "npr": 0,
+            "ufd": 0,
+            "crossvit": 0
         }
 
         return result
@@ -271,10 +287,12 @@ def analyze_groq(api_key: str, image_path: str) -> dict:
         
         # Consistent UI bars
         naturalness = (100 - conf) / 100.0
+        # Consistent UI bars
+        # Will be updated with real values in run_analysis
         result["model_breakdown"] = {
-            "npr": naturalness,
-            "ufd": naturalness,
-            "crossvit": naturalness
+            "npr": 0,
+            "ufd": 0,
+            "crossvit": 0
         }
         return result
     except Exception as e:
@@ -507,24 +525,28 @@ def post_process_face_swap(result: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # Result Refinement                                                             #
 # --------------------------------------------------------------------------- #
-def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool = False):
+def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool = False, face_swap_confidence: int = 0, nudity_detected: bool = False):
     """
     Standardize verdict and score.
     Returns: (verdict_string, corrected_score)
     """
     score = int(score)
+    fs_conf = int(face_swap_confidence)
 
-    # HIGHEST PRIORITY: if face_swap_detected flag is set, always return Face Swap
-    if face_swap_detected:
-        return "Face Swap", max(score, 85)
+    # HIGHEST PRIORITY: Nudity-based Deepfake
+    # If nudity or partial nudity is detected, we classify as Deepfake.
+    if nudity_detected:
+        return "Deepfake", max(score, 88)
 
-    # If the original verdict was 'Face Swap' but detection flag is FALSE,
-    # it's usually just an AI-enhanced image. User wants 55% for this.
-    if original_verdict == "Face Swap":
-        return "AI Camera / Enhanced", 55
-
-    if original_verdict == "Deepfake":
-        return "Deepfake", score
+    # SECOND PRIORITY: High-Confidence Face Swap
+    # Only return "Deepfake" if the face swap confidence is high enough (>= 85).
+    # If it's an 'AI Enhanced' image with some swap-like signs but low confidence, show 'AI Camera / Enhanced'.
+    if (face_swap_detected or original_verdict in ["Face Swap", "Deepfake"]):
+        if fs_conf >= 85:
+            return "Deepfake", max(score, 88)
+        else:
+            # Suspected/Subtle swap signs or general AI enhancements -> AI Camera / Enhanced
+            return "AI Camera / Enhanced", 55
 
     # Protect these high-impact labels from being downgraded by score buckets
     PROTECTED_VERDICTS = {"AI Generated Proof", "AI Generated", "Highly Suspicious", "Face Swap"}
@@ -532,7 +554,7 @@ def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool =
         return original_verdict, score
 
     # User specifically wants AI Enhanced images to show as 55% confidence
-    if original_verdict == "AI Camera / Enhanced":
+    if original_verdict in ["AI Camera / Enhanced", "AI Camera", "Enhanced"]:
         return "AI Camera / Enhanced", 55
 
     # Standard score buckets (Used when all models agree on 'Uncertain' or 'Likely Real' etc)
@@ -540,12 +562,12 @@ def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool =
         return "AI Generated Proof", score
     elif score >= 60: 
         return "Highly Suspicious", score
-    elif score >= 20: # Lowered from 25 to capture user's "20-30" range
+    elif score >= 40: # Aggressive mobile post-processing or AI Camera typical range
         return "AI Camera / Enhanced", 55
-    elif score >= 10: # Lowered from 15 to keep "Likely Real" separate
-        return "Likely Real", score
+    elif score >= 15: # Lowered from 20 to capture subtle smoothing as Likely Real
+        return "Likely Real", 15 # 85% realness
     else:
-        return "Verified Real", score
+        return "Verified Real", 5 # 95% realness
 
 
 # --------------------------------------------------------------------------- #
@@ -599,29 +621,50 @@ def merge_results(r_gemini: dict, r_groq: dict, r_hive: dict = None) -> dict:
             fused_score = max(scores) if scores else fused_score
             
             # Special case: If we veto Hive's 'Real' and brokers are in the 20-30 range, 
-            # we force the verdict to AI Camera / Enhanced.
-            # This follows user's "points like 20-30 then show AI ENHANCED"
+            # we force the verdict to Deepfake if swap signs existed, else Enhanced.
+            # User wants "Deepfake with rose red" for these now.
             if 20 <= fused_score < 60:
                 merged_fp_pre = {}
                 tmp_flags = []
                 tmp_auth = []
+                is_swap_suspected = False
+                nudity_in_fusion = False
+                n_conf = 0
+                
                 for r in results:
                     merged_fp_pre.update(r.get("forensic_points", {}))
                     tmp_flags.extend(r.get("key_red_flags", []))
                     tmp_auth.extend(r.get("key_authentic_signals", []))
+                    if r.get("face_swap_detected"):
+                        is_swap_suspected = True
+                    if r.get("nudity_detected"):
+                        nudity_in_fusion = True
+                        n_conf = max(n_conf, r.get("nudity_confidence", 0))
+
+                # Use refine_verdict to decide if this should be Deepfake or Enhanced
+                # This ensures we don't force 'Deepfake' on low-confidence suspected swaps
+                v, s = refine_verdict(
+                    fused_score,
+                    "Face Swap" if is_swap_suspected else "AI Camera / Enhanced",
+                    face_swap_detected=is_swap_suspected,
+                    face_swap_confidence=max([int(r.get("face_swap_confidence", 0)) for r in results]),
+                    nudity_detected=nudity_in_fusion
+                )
 
                 return {
-                    "verdict": "AI Camera / Enhanced",
-                    "confidence_score": 55, # User's preferred confidence for Enhanced
-                    "explanation": f"Subtle AI enhancements detected by {', '.join(sources)}. (Broker detection {fused_score}% vs Hive Realness)",
+                    "verdict": v,
+                    "confidence_score": s,
+                    "explanation": f"Forensic analysis prioritized over Hive: {v} signs identified by {', '.join(sources)}.",
                     "forensic_points": merged_fp_pre,
                     "key_red_flags": list(set(tmp_flags)),
                     "key_authentic_signals": list(set(tmp_auth)),
-                    "face_swap_detected": any(r.get("face_swap_detected", False) for r in results),
-                    "face_swap_confidence": max([int(r.get("face_swap_confidence", 0)) for r in results] + [0]),
+                    "face_swap_detected": is_swap_suspected,
+                    "nudity_detected": nudity_in_fusion,
+                    "nudity_confidence": n_conf,
+                    "face_swap_confidence": max([int(r.get("face_swap_confidence", 0)) for r in results]),
                     "model_breakdown": {r.get("_source", "Model"): r.get("confidence_score", 0) for r in results},
                     "_sources_used": sources,
-                    "_fusion_note": "AI Enhancement Veto triggered (Neural Broker discovery prioritized over Hive Realness)."
+                    "_fusion_note": f"Veto Logic: Reclassified to {v} based on neural markers."
                 }
 
     # HI-PRIORITY: Hive Authority Override
@@ -699,6 +742,14 @@ def merge_results(r_gemini: dict, r_groq: dict, r_hive: dict = None) -> dict:
     red_flags = list(set(red_flags))
     auth_signals = list(set(auth_signals))
 
+    # Merge nudity details
+    nudity_details = {
+        "male_genitalia": any(r.get("nudity_details", {}).get("male_genitalia", False) for r in results),
+        "female_genitalia": any(r.get("nudity_details", {}).get("female_genitalia", False) for r in results),
+        "female_breasts": any(r.get("nudity_details", {}).get("female_breasts", False) for r in results),
+        "anatomical_description": " | ".join(list(set([r.get("nudity_details", {}).get("anatomical_description", "") for r in results if r.get("nudity_details", {}).get("anatomical_description")])))
+    }
+
     # Merge forensic_points
     merged_fp = {}
     for r in results:
@@ -728,6 +779,7 @@ def merge_results(r_gemini: dict, r_groq: dict, r_hive: dict = None) -> dict:
         "forensic_points": merged_fp,
         "key_red_flags": red_flags,
         "key_authentic_signals": auth_signals,
+        "nudity_details": nudity_details,
         "image_type_guess": results[0].get("image_type_guess", "Unknown"),
         "explanation": fused_explanation,
         "_sources_used": sources,
@@ -898,10 +950,51 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
         v, s = refine_verdict(
             result["confidence_score"],
             result.get("verdict", ""),
-            face_swap_detected=bool(result.get("face_swap_detected", False))
+            face_swap_detected=bool(result.get("face_swap_detected", False)),
+            face_swap_confidence=int(result.get("face_swap_confidence", 0)),
+            nudity_detected=bool(result.get("nudity_detected", False))
         )
         result["verdict"] = v
         result["confidence_score"] = s
+
+    # ── STEP 4.5: Calculate Real Forensic Metrics ─────────────────────────── #
+    if "error" not in result and FORENSIC_METRICS_AVAILABLE:
+        try:
+            npr_val = calculate_npr(image_path)
+            ufd_val = calculate_ufd(image_path)
+            cvit_val = calculate_crossvit_proxy(image_path)
+            
+            # Map back to 0-100 percentages (100 = suspicious)
+            result["model_breakdown"] = {
+                "npr": round(npr_val * 100),
+                "ufd": round(ufd_val * 100),
+                "crossvit": round(cvit_val * 100)
+            }
+            
+            # Add to forensic points for transparency
+            fp = result.get("forensic_points", {})
+            fp["neural_pixel_ratio"] = f"Abnormality Score: {npr_val:.2f}"
+            fp["unnatural_face_detail"] = f"Face/BG Entropy Diff: {ufd_val:.2f}"
+            fp["cross_vit_signature"] = f"Patch Consistency Score: {cvit_val:.2f}"
+            result["forensic_points"] = fp
+            
+        except Exception as fe:
+            print(f"[FORENSIC_METRICS] Error: {fe}", file=sys.stderr)
+
+    # ── STEP 4.6: Calculate Local NSFW/Skin Heuristic ─────────────────────── #
+    if "error" not in result and NSFW_DETECTOR_AVAILABLE:
+        try:
+            skin_score, skin_metrics = calculate_skin_score(image_path)
+            result["_local_skin_score"] = skin_score
+            result["_local_skin_metrics"] = skin_metrics
+            
+            # Corroboration rule: if LLM suspected nudity and local finds high skin volume
+            if result.get("nudity_confidence", 0) > 30 and skin_score > 0.6:
+                result["nudity_confidence"] = max(result["nudity_confidence"], round(skin_score * 100))
+                result["nudity_detected"] = True
+                
+        except Exception as ne:
+            print(f"[NSFW_DETECTOR] Error: {ne}", file=sys.stderr)
 
     # ── STEP 5: White Background Override ─────────────────────────────────── #
     # If the user requested white backgrounds be classified as 'AI Camera / Enhanced'

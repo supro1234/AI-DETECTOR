@@ -277,7 +277,7 @@ export default function DetectPage({ config, onReset }) {
   const isReal     = verdict.includes('real')
   const isEnhanced = verdict.includes('enhanced')
   const isSuspicious = verdict.includes('suspicious')
-  const isFaceSwap = result?.face_swap_detected === true || verdict.includes('face swap')
+  const isFaceSwap = result?.face_swap_detected === true || verdict.includes('face swap') || verdict.includes('deepfake');
   const vColor     = result
     ? (isFaceSwap ? '#ff3d71' : isReal ? 'var(--success)' : (isSuspicious ? 'var(--danger)' : 'var(--warning)'))
     : 'var(--accent-primary)'

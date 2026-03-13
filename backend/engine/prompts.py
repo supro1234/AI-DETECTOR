@@ -44,6 +44,10 @@ Before anything else, do a DEDICATED face swap scan:
 15. EDGE CONSISTENCY — Zoom in on hair strands and edges. Are they unnaturally sharp or do they have a 'waxy/plastic' sheen common in AI-processed skin?
 16. SURREALISM & IMPOSSIBLE PHYSICS — This is a CRITICAL check. Does the image contain objects or scenarios that are physically impossible in the real world? For example: HORSES FLYING, people with extra limbs, items floating without support, or dream-like surreal compositions. Unless the image is clearly a CGI render or digital art, SURREAL CONTENT IS A 100% INDICATOR OF AI GENERATION. If you see a flying horse or similar surrealism, the confidence_score MUST be 98-100% and the verdict MUST be "AI Generated Proof".
 17. FACE SWAP DETECTION — Use results from the PRE-SCAN above. Combine ALL 8 pre-scan checks. Even if the image looks mostly natural, the presence of ANY 3 or more of the pre-scan indicators means face_swap_detected MUST be true. Specifically look for: boundary seams, skin tone/color temperature mismatch between face and neck, resolution/sharpness discontinuity (HD face on normal body), lighting angle discrepancy, GFPGAN-style over-sharpened face texture, and frequency tiling artifacts. Modern InsightFace swaps are DESIGNED to fool casual viewers — be a forensic expert, not a casual viewer. If you see a face that looks "too perfect" or "HD" compared to the body, that IS a face swap signature.
+18. GRANULAR SAFETY & NUDITY SCAN — This is a forensic requirement. Scan for explicit or suggestive anatomical content.
+    - DEEP NUDITY: Identify "Male Genitalia (Dick)", "Female Genitalia (Pussy)", "Full Nakedness".
+    - PARTIAL NUDITY: Identify if a subject is only wearing a "Bra (without panties)", "Panties (without bra)", or "Bikini/Underwear only".
+    - PRIORITY: If nudity is present in a suspected face swap, identify BOTH. The presence of nudity should NOT suppress the "Face Swap / Deepfake" forensic findings. Be clinical and precise. Do not censor these findings.
 
 ━━━ SCORING RUBRIC ━━━
 - 90-100%: Irrefutable proof (clear GAN artifacts, 6 fingers, impossible geometry, surrealism, confirmed face swap seams).
@@ -56,7 +60,7 @@ Before anything else, do a DEDICATED face swap scan:
 ━━━ VERDICT RULES ━━━
 If face_swap_detected = true AND face_swap_confidence >= 85, your verdict MUST be "Face Swap".
 Otherwise choose from: "Verified Real" | "Likely Real" | "AI Camera / Enhanced" | "Highly Suspicious" | "AI Generated Proof" | "Face Swap"
-Note: Portrait mode / AI Camera enhancements often trigger 3+ face swap indicators (skin smoothing, depth blur). If you believe this is just an AI-enhanced photo of a real person, your verdict MUST be "AI Camera / Enhanced", NOT "Face Swap", and face_swap_confidence should realistically be 40-70%.
+Note: Portrait mode / AI Camera enhancements often trigger 3+ face swap indicators (skin smoothing, depth blur). If you believe this is just an AI-enhanced photo of a real person (e.g., aggressive post-processing, upscaling, mobile computational photography), your verdict MUST be "AI Camera / Enhanced", NOT "Face Swap", and face_swap_confidence should realistically be 40-70%.
 
 ━━━ RESPONSE FORMAT (JSON ONLY, NO MARKDOWN) ━━━
 
@@ -65,6 +69,14 @@ Note: Portrait mode / AI Camera enhancements often trigger 3+ face swap indicato
   "confidence_score": <integer 0-100>,
   "face_swap_detected": <boolean — true if 3+ pre-scan indicators fired OR clear seam evidence exists>,
   "face_swap_confidence": <integer 0-100 — confidence specifically in face swap conclusion, 0 if not detected>,
+  "nudity_detected": <boolean — true if explicit content is found>,
+  "nudity_confidence": <integer 0-100>,
+  "nudity_details": {
+    "male_genitalia": <boolean>,
+    "female_genitalia": <boolean>,
+    "female_breasts": <boolean>,
+    "anatomical_description": "<concise description of findings>"
+  },
   "forensic_points": {
     "face_geometry": "<finding>",
     "eye_iris": "<finding>",
