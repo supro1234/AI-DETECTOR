@@ -16,6 +16,12 @@ const PYTHON = process.env.PYTHON_PATH || 'python';
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// ─── Serve Static Frontend Assets (Production) ──────────────────────────────
+const frontendDist = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+}
+
 // ─── Supported image MIME types ───────────────────────────────────────────────
 const IMAGE_MIMES = new Set([
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -375,7 +381,16 @@ app.post('/api/generate-report', (req, res) => {
     }
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
+// ─── Catch-all for SPA Routing (Production) ──────────────────────────────────
+app.get('*', (req, res) => {
+    const indexPath = path.join(__dirname, '../frontend/dist', 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).json({ error: 'Frontend build not found' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`✅ AI Image Detector API running → http://localhost:${PORT}`);
 });
