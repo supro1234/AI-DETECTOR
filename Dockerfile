@@ -2,10 +2,16 @@
 # Stage 1: Build the frontend
 FROM node:18 AS build-stage
 WORKDIR /app/frontend
+
+# Ensure we install devDependencies even if NODE_ENV is set to production
+ENV NODE_ENV=development
+
 COPY frontend/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install --include=dev --legacy-peer-deps
+
 COPY frontend/ ./
-RUN npm run build
+# Use npx to ensure vite is found in the local node_modules
+RUN npx vite build
 
 # Stage 2: Production environment
 FROM node:18-slim
