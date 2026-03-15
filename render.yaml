@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ai-image-detector
+    runtime: docker
+    plan: free # or your preferred plan
+    region: oregon # or your preferred region
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: HIVE_API_KEY
+        sync: false
+      - key: PORT
+        value: 8301
