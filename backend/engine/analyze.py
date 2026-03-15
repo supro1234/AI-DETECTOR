@@ -525,47 +525,68 @@ def post_process_face_swap(result: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # Result Refinement                                                             #
 # --------------------------------------------------------------------------- #
-def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool = False, face_swap_confidence: int = 0, nudity_detected: bool = False):
+def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool = False, face_swap_confidence: int = 0, nudity_detected: bool = False, explanation: str = ""):
     """
     Standardize verdict and score.
     Returns: (verdict_string, corrected_score)
     """
     score = int(score)
     fs_conf = int(face_swap_confidence)
+    explanation = (explanation or "").lower()
+
+    # KEYWORD-BASED SKEPTICISM BOOST
+    # If the model mentions forensic markers of enhancement but score is low, boost it.
+    ENHANCEMENT_KEYWORDS = [
+        "smoothed", "upscaled", "denoised", "waxy", "filter", "upscale", "denoise", "smooth",
+        "plastic", "sheen", "waxiness", "filtered", "processed", "artificial", "textureless",
+        "synthetic", "rendered", "denoising", "post-processed", "unnatural skin"
+    ]
+    
+    # Robust keyword check (strip common punctuation)
+    clean_explanation = explanation.replace(".", " ").replace(",", " ").replace("!", " ")
+    has_enhancement_keyword = any(kw in clean_explanation for kw in ENHANCEMENT_KEYWORDS)
+    
+    if has_enhancement_keyword and score < 45:
+        # Boost to the middle of the 'AI Camera / Enhanced' range
+        score = max(score, 45)
+        if original_verdict in ["Likely Real", "Verified Real", "Real", "Uncertain"]:
+            original_verdict = "AI Camera / Enhanced"
 
     # HIGHEST PRIORITY: Nudity-based Deepfake
-    # If nudity or partial nudity is detected, we classify as Deepfake.
-    if nudity_detected:
+    # Decoupled nudge: Only force "Deepfake" if nudity is present AND there is significant AI signal.
+    # Otherwise, it might just be a real nude photo with subtle skin smoothing.
+    if nudity_detected and score >= 70:
         return "Deepfake", max(score, 88)
 
     # SECOND PRIORITY: High-Confidence Face Swap
-    # Only return "Deepfake" if the face swap confidence is high enough (>= 85).
-    # If it's an 'AI Enhanced' image with some swap-like signs but low confidence, show 'AI Camera / Enhanced'.
     if (face_swap_detected or original_verdict in ["Face Swap", "Deepfake"]):
         if fs_conf >= 85:
             return "Deepfake", max(score, 88)
+        elif score >= 70:
+            # High AI score + any swap mention -> Deepfake
+            return "Deepfake", score
         else:
-            # Suspected/Subtle swap signs or general AI enhancements -> AI Camera / Enhanced
-            return "AI Camera / Enhanced", 55
+            # Lower score or subtle signal -> AI Camera / Enhanced
+            return "AI Camera / Enhanced", max(score, 55)
 
-    # Protect these high-impact labels from being downgraded by score buckets
+    # Protected high-impact labels
     PROTECTED_VERDICTS = {"AI Generated Proof", "AI Generated", "Highly Suspicious", "Face Swap"}
     if original_verdict in PROTECTED_VERDICTS:
         return original_verdict, score
 
-    # User specifically wants AI Enhanced images to show as 55% confidence
+    # Forced range for specified labels
     if original_verdict in ["AI Camera / Enhanced", "AI Camera", "Enhanced"]:
-        return "AI Camera / Enhanced", 55
+        return "AI Camera / Enhanced", max(score, 45)
 
-    # Standard score buckets (Used when all models agree on 'Uncertain' or 'Likely Real' etc)
+    # Standard score buckets (Skeptical Mode)
     if score >= 85:
         return "AI Generated Proof", score
     elif score >= 60: 
         return "Highly Suspicious", score
-    elif score >= 40: # Aggressive mobile post-processing or AI Camera typical range
-        return "AI Camera / Enhanced", 55
-    elif score >= 15: # Lowered from 20 to capture subtle smoothing as Likely Real
-        return "Likely Real", 15 # 85% realness
+    elif score >= 12: # Lowered floor from 15 to 12 to capture ultra-subtle enhancements
+        return "AI Camera / Enhanced", max(score, 45)
+    elif score >= 8: # Tighter Likely Real window
+        return "Likely Real", 10 # 90% realness
     else:
         return "Verified Real", 5 # 95% realness
 
@@ -743,10 +764,24 @@ def merge_results(r_gemini: dict, r_groq: dict, r_hive: dict = None) -> dict:
     auth_signals = list(set(auth_signals))
 
     # Merge nudity details
+    # Collect all clothing types
+    all_clothing = [str(r.get("nudity_details", {}).get("clothing_type", "")).strip() for r in results if r.get("nudity_details", {}).get("clothing_type")]
+    
+    # Priority for clothing type (most specific/suspicious first)
+    CLOTHING_PRIO = ["None", "Underwear", "Bikini", "Sports Bra", "Normal Clothing"]
+    best_clothing = "Normal Clothing"
+    for cp in CLOTHING_PRIO:
+        if any(cp.lower() in c.lower() for c in all_clothing):
+            best_clothing = cp
+            break
+
     nudity_details = {
+        "is_explicit_nudity": any(r.get("nudity_details", {}).get("is_explicit_nudity", False) for r in results),
+        "is_partial_nudity": any(r.get("nudity_details", {}).get("is_partial_nudity", False) for r in results),
         "male_genitalia": any(r.get("nudity_details", {}).get("male_genitalia", False) for r in results),
         "female_genitalia": any(r.get("nudity_details", {}).get("female_genitalia", False) for r in results),
         "female_breasts": any(r.get("nudity_details", {}).get("female_breasts", False) for r in results),
+        "clothing_type": best_clothing,
         "anatomical_description": " | ".join(list(set([r.get("nudity_details", {}).get("anatomical_description", "") for r in results if r.get("nudity_details", {}).get("anatomical_description")])))
     }
 
@@ -952,7 +987,8 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
             result.get("verdict", ""),
             face_swap_detected=bool(result.get("face_swap_detected", False)),
             face_swap_confidence=int(result.get("face_swap_confidence", 0)),
-            nudity_detected=bool(result.get("nudity_detected", False))
+            nudity_detected=bool(result.get("nudity_detected", False)),
+            explanation=result.get("explanation", "")
         )
         result["verdict"] = v
         result["confidence_score"] = s
@@ -988,10 +1024,29 @@ def run_analysis(gemini_key: str, groq_key: str, openrouter_key: str, image_path
             result["_local_skin_score"] = skin_score
             result["_local_skin_metrics"] = skin_metrics
             
-            # Corroboration rule: if LLM suspected nudity and local finds high skin volume
-            if result.get("nudity_confidence", 0) > 30 and skin_score > 0.6:
+            # ── STEP 4.6: Calculate Local NSFW/Skin Heuristic ─────────────────────── #
+            # Improved logic: Respect the AI's clothing analysis.
+            # Don't force nudity flag if AI explicitly identified swimwear/sportswear.
+            nudity_details = result.get("nudity_details", {})
+            explanation = str(result.get("explanation", "")).lower()
+            clothing = str(nudity_details.get("clothing_type", "")).lower()
+            
+            SPORTSWEAR_KWS = ["sports bra", "bikini", "swimwear", "swimsuit", "athletic wear", "gym wear"]
+            is_sportswear = any(kw in clothing for kw in SPORTSWEAR_KWS) or any(kw in explanation for kw in SPORTSWEAR_KWS)
+            
+            # Corroboration rules:
+            llm_suspects = result.get("nudity_confidence", 0) > 40
+            skin_heavy = skin_score > 0.75 # Increased from 0.6
+            
+            if llm_suspects and skin_heavy and not is_sportswear:
                 result["nudity_confidence"] = max(result["nudity_confidence"], round(skin_score * 100))
                 result["nudity_detected"] = True
+            elif is_sportswear:
+                # If AI identified it as sportswear, follow its lead and keep nudity false
+                # unless explicit parts were also checked
+                if not (nudity_details.get("female_breasts") or nudity_details.get("female_genitalia")):
+                    result["nudity_detected"] = False
+                    result["nudity_confidence"] = min(result.get("nudity_confidence", 0), 25)
                 
         except Exception as ne:
             print(f"[NSFW_DETECTOR] Error: {ne}", file=sys.stderr)
