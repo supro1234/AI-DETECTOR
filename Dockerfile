@@ -3,22 +3,21 @@
 FROM node:20-alpine AS build-stage
 WORKDIR /app/frontend
 
-# Install dependencies separately for better caching
 COPY frontend/package*.json ./
 RUN npm install --legacy-peer-deps
 
-# Copy frontend source and build
 COPY frontend/ ./
-# Explicitly force permissions on bin folder before build
-RUN chmod -R +x node_modules/.bin && npm run build
+RUN npm run build
 
 # Stage 2: Production environment
 FROM node:20-slim
 
-# Install Python and OpenCV dependencies
+# Install Python and build dependencies for heavy libraries like numpy/opencv
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
+    python3-dev \
+    build-essential \
     libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
