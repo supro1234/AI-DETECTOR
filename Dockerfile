@@ -3,7 +3,7 @@
 FROM node:18 AS build-stage
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 COPY frontend/ ./
 RUN npm run build
 
@@ -23,7 +23,7 @@ WORKDIR /app
 # Copy backend
 COPY backend/package*.json ./backend/
 WORKDIR /app/backend
-RUN npm install
+RUN npm install --legacy-peer-deps
 COPY backend/ ./
 
 # Copy built frontend dist to the location server.js expects
