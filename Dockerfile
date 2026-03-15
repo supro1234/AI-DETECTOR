@@ -1,6 +1,7 @@
 # Multi-stage build for AI Image Detector
 # Stage 1: Build the frontend
-FROM node:18 AS build-stage
+# Upgrading to Node 20 to fix "ReferenceError: CustomEvent is not defined" in Vite
+FROM node:20 AS build-stage
 WORKDIR /app/frontend
 
 # Ensure we have all build tools
@@ -9,12 +10,11 @@ RUN npm install --legacy-peer-deps
 
 COPY frontend/ ./
 
-# Fix permissions for binaries and run build
-# Using 'npm run build' which is most compatible
-RUN chmod -R +x node_modules/.bin && npm run build
+# Build the frontend
+RUN npm run build
 
 # Stage 2: Production environment
-FROM node:18-slim
+FROM node:20-slim
 
 # Install Python and OpenCV dependencies
 RUN apt-get update && apt-get install -y \
