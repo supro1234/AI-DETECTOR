@@ -534,23 +534,59 @@ def refine_verdict(score: int, original_verdict: str, face_swap_detected: bool =
     fs_conf = int(face_swap_confidence)
     explanation = (explanation or "").lower()
 
-    # KEYWORD-BASED SKEPTICISM BOOST
-    # If the model mentions forensic markers of enhancement but score is low, boost it.
-    ENHANCEMENT_KEYWORDS = [
-        "smoothed", "upscaled", "denoised", "waxy", "filter", "upscale", "denoise", "smooth",
-        "plastic", "sheen", "waxiness", "filtered", "processed", "artificial", "textureless",
-        "synthetic", "rendered", "denoising", "post-processed", "unnatural skin"
+    # KEYWORD-BASED SKEPTICISM BOOST (Tiered Detection)
+    # Tier 1: Heavy AI/Synthetic artifacts -> Force "AI Camera / Enhanced"
+    HEAVY_ENHANCEMENT = [
+        "waxy", "plastic", "artificial", "synthetic", "textureless", "over-smoothed", 
+        "unnatural skin", "plastic skin", "rendered", "texture loss", "sheen"
+    ]
+    # Tier 2: Subtle enhancements -> Allow "Likely Real" but flag it
+    SUBTLE_ENHANCEMENT = [
+        "smoothed", "filtered", "processed", "denoised", "upscaled", "skin smoothing",
+        "softened", "beauty filter", "portrait mode", "post-processed"
     ]
     
-    # Robust keyword check (strip common punctuation)
     clean_explanation = explanation.replace(".", " ").replace(",", " ").replace("!", " ")
-    has_enhancement_keyword = any(kw in clean_explanation for kw in ENHANCEMENT_KEYWORDS)
+    has_heavy = any(kw in clean_explanation for kw in HEAVY_ENHANCEMENT)
+    has_subtle = any(kw in clean_explanation for kw in SUBTLE_ENHANCEMENT)
     
-    if has_enhancement_keyword and score < 45:
-        # Boost to the middle of the 'AI Camera / Enhanced' range
+    # Logic: Heavy artifacts always trigger "Enhanced"
+    if has_heavy and score < 45:
         score = max(score, 45)
         if original_verdict in ["Likely Real", "Verified Real", "Real", "Uncertain"]:
             original_verdict = "AI Camera / Enhanced"
+            
+    # Logic: Subtle enhancements boost to at least "Likely Real" (8-11 range)
+    # but don't force them all the way to "Enhanced" unless the score is already high.
+    elif has_subtle and score < 8:
+        score = 10  # This lands in the "Likely Real" bucket
+        if original_verdict in ["Verified Real", "Real"]:
+            original_verdict = "Likely Real"
+
+    # CRITICAL: SURREALISM & IMPOSSIBLE CONTENT BOOST
+    # Any mention of impossible physics or surreal content forces "AI Generated Proof"
+    SURREALISM_KEYWORDS = [
+        "impossible", "surreal", "physically impossible", "floating", "flying",
+        "impossible physics", "anatomical error", "hallucinated", "cat eating table",
+        "flying horse", "multiple limbs", "distorted anatomy", "nonsense",
+        "biting wood", "eating a table", "gnawing wood", "impossible scene",
+        "unnatural behavior", "cat biting table"
+    ]
+    has_surreal = any(kw in clean_explanation for kw in SURREALISM_KEYWORDS)
+    
+    # Tier 3: REVERSE LOGIC PROTECTION
+    # If a model uses "absence of artifacts" to support a "Real" verdict but
+    # it's an impossible scene, they are being tricked.
+    REVERSE_LOGIC_KEYWORDS = [
+        "absence of gan", "absence of artifacts", "supports this assessment",
+        "no significant indicators", "no clear signs of ai", "lack of ai indicators",
+        "no artifacts", "without artifacts", "appears natural"
+    ]
+    has_reverse_logic = any(kw in clean_explanation for kw in REVERSE_LOGIC_KEYWORDS)
+    
+    # If it's an impossible scene OR they used defensive reasoning ANYWHERE in a non-raw image
+    if has_surreal or (has_reverse_logic and score >= 1):
+        return "AI Generated Proof", max(score, 95)
 
     # HIGHEST PRIORITY: Nudity-based Deepfake
     # Decoupled nudge: Only force "Deepfake" if nudity is present AND there is significant AI signal.

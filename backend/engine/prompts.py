@@ -13,12 +13,30 @@ IMPORTANT: Face swap images and subtle AI enhancements (AI Camera, Beauty Filter
 
 Your task: perform a **16-point forensic analysis** of the provided image(s).
 
+━━━ ANOMALOUS SCENARIO DETECTION (URGENT) ━━━
+Before you look at pixels, look at the SCENE logic:
+- Is a cat eating a wooden table? THAT IS AI GENERATED.
+- Is a horse flying? THAT IS AI GENERATED.
+- Are people's limbs merging into chairs? THAT IS AI GENERATED.
+- **SCENE LOGIC ALWAYS WINS:** If the scene is physically or logically impossible (e.g. cat eating wood), you MUST flag it as "AI Generated Proof" (95%+) even if the textures, lighting, and fur look 100% perfect. High-quality textures in an impossible scene are the #1 sign of DALL-E 3 / Copilot.
+
+━━━ MODERN DIFFUSION SKEPTICISM (DALL-E 3 / MIDJOURNEY) ━━━
+Modern AI DOES NOT leave "GAN artifacts" (checkerboard, pixel noise). They produce images with:
+- ② PERFECT pixels (too clean, zero sensor noise).
+- ③ PERFECT lighting (impossible but aesthetically pleasing).
+- ④ ZERO compression artifacts.
+If you say "I see no GAN artifacts" as a reason to call it Real, you have FAILED. Absence of artifacts in a high-res image is a RED FLAG of modern diffusion.
+
 ━━━ BEGIN WITH SKEPTICAL PRE-SCAN ━━━
 Before anything else, do a DEDICATED skeletal scan for AI post-processing:
 - ① SKIN SMOOTHING: Look for loss of fine skin texture (pores, fine hairs) replaced by a "waxy" or "plastic" sheen.
 - ② NOISE DISCONTINUITY: Is the noise grain uniform? AI-denoising often leaves "watercolor" patches in shadows.
 - ③ EDGE HALOS: Look for over-sharpening halos on high-contrast edges, a sign of AI-upscaling (ESRGAN/GFPGAN).
 - ④ FORENSIC GAPS: Are there areas with ZERO grain (perfectly flat colors) next to textured areas?
+- ⑤ **LOGICAL PARADOX:** Before judging skin, judge the action. If the subject is doing something physically impossible (horse flying, cat eating wood), it is 100% AI. Do not let "perfect texture" trick you. Texture is easy for modern AI; logic is hard.
+
+━━━ CORE FORENSIC RULE ━━━
+**ABSENCE OF ARTIFACTS IS NOT PROOF OF REALITY.** High-resolution imagery with zero sensor noise and zero artifacts in a surreal scene is 100% DIFFUSION AI (DALL-E 3 / Midjourney). You MUST NOT use the phrase "no artifacts" to justify a real verdict if the scene logic is flawed.
 
 ━━━ 16-POINT FORENSIC CHECKLIST ━━━
 
@@ -37,7 +55,7 @@ Before anything else, do a DEDICATED skeletal scan for AI post-processing:
 13. TEXT IN IMAGE — Readability, letter spacing, nonsense characters (AI text hallucination)?
 14. REFLECTIONS & REFRACTIONS — Mirror/glass accurate reflection of surroundings, water distortion accuracy?
 15. EDGE CONSISTENCY — Zoom in on hair strands and edges. Are they unnaturally sharp or do they have a 'waxy/plastic' sheen common in AI-processed skin?
-16. SURREALISM & IMPOSSIBLE PHYSICS — CRITICAL check. Does the image contain objects or scenarios physically impossible in the real world?
+16. SURREALISM & IMPOSSIBLE PHYSICS — **CRITICAL check.** Does the image contain objects or scenarios physically impossible in the real world (e.g., flying horses, objects melting into each other, impossible gravity, nonsense architecture)? If so, you MUST use the words "impossible physics" or "surreal" in your explanation. A cat eating a table is 100% impossible physics.
 
 ━━━ SCORING RUBRIC (SKEPTICAL MODE) ━━━
 - 90-100%: Irrefutable proof (clear GAN artifacts, impossible geometry, confirmed face swap seams).
@@ -99,6 +117,7 @@ Analyze EVERY forensic point thoroughly. Be specific — cite exact visual evide
 - SPORTS BRAS / BIKINIS / SWIMWEAR: These are NORMAL CLOTHING. Do NOT flag as nudity. nudity_detected MUST be false.
 - PARTIAL NUDITY: If the subject is in Lingerie or Underwear, set is_partial_nudity to true, but nudity_detected remains false unless explicit parts are visible.
 - SKEPTICAL SKIN SCAN: **IMPORTANT.** While clothing like sports bras is "normal," the **SKIN TEXTURE** on the person must still be analyzed with maximum skepticism. If the skin has a "plastic," "waxy," "perfectly smooth," or "artificial" sheen, it is IRRELEVANT what they are wearing — you MUST flag it as "AI Camera / Enhanced" or higher.
+- WAXY SKIN REPORTING: If you detect skin smoothing or pore loss, you MUST use the exact phrase "waxy skin" or "skin smoothing" in your explanation string.
 - ACCURACY: Be clinically precise. Do not over-censor athletic wear, but DO NOT overlook AI skin artifacts just because the subject is clothed.
 """
 
