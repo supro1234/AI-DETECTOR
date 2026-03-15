@@ -79,7 +79,7 @@ export default function HistoryPage() {
 
   const handleDownloadReport = async (item) => {
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8301';
+      const API_BASE = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:8301' : '');
       const response = await axios.post(`${API_BASE}/api/generate-report`, item, {
         responseType: 'blob'
       });

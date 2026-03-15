@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8301';
+const API_BASE = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8301' : '');
 import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, ShieldAlert, CheckCircle, Info, Scan, Loader2, RefreshCw, Download, BarChart2, Activity, Terminal, AlertTriangle, Users, Cpu, Zap, Shield } from 'lucide-react'
 import axios from 'axios'
